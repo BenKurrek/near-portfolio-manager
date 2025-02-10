@@ -1,0 +1,29 @@
+[package]
+name = "proxy"
+version = "0.1.0"
+authors = ["Ben Kurrek <bkurrek@uwaterloo.ca>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+near-sdk = "5.5.0"
+serde_json = "1.0.91"
+bs58 = "0.4"
+omni-transaction = { git = "https://github.com/near/omni-transaction-rs.git", branch = "master" }
+hex = "0.4.3"
+fixed-hash = { version = "0.8.0", default-features = false }
+sha2 = "0.10.8"
+base64 = "0.22.1"
+sha3 = { version = "0.10.8", default-features = false }
+
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
+
