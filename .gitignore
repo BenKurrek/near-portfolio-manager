@@ -1,0 +1,85 @@
+# ----------------------
+# Dependencies & Lockfiles
+# ----------------------
+node_modules/
+.pnp.js
+.pnp.cjs
+.pnp.loader.mjs
+.npmrc
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# ----------------------
+# Build Output / Compiled
+# ----------------------
+**/dist/
+**/build/
+**/out/
+# If you have other compiled output directories, add them similarly:
+# **/public/
+# **/lib/
+
+# ----------------------
+# Node & PNPM caches
+# ----------------------
+.pnpm/
+**/.pnp/
+.parcel-cache
+.cache/
+target/
+
+# ----------------------
+# Temporary or Generated Files
+# ----------------------
+*.csv
+**/address.txt
+**/keys*.json
+metadata*.json
+signature.json
+
+# If you only want to ignore certain .json files in a certain folder, 
+# adapt this pattern carefully, otherwise it may be too broad.
+
+# ----------------------
+# Coverage & Test Artifacts
+# ----------------------
+coverage/
+**/coverage/
+.nyc_output/
+**/.nyc_output/
+
+# ----------------------
+# Environment Files
+# ----------------------
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ----------------------
+# Project-specific Folders to Ignore
+# ----------------------
+# If you have a "toRead" or "data" folder in multiple places:
+toRead/
+**/toRead/
+data/
+**/data/
+# If you have a "neardev" folder containing dev keys, etc.
+neardev
+
+# ----------------------
+# OS / Editor Artifacts
+# ----------------------
+.DS_Store
+*.swp
+Thumbs.db
+
+# ----------------------
+# Logs
+# ----------------------
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
