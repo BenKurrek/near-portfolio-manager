@@ -17,13 +17,22 @@ fixed-hash = { version = "0.8.0", default-features = false }
 sha2 = "0.10.8"
 base64 = "0.22.1"
 sha3 = { version = "0.10.8", default-features = false }
-
+bnum = { version = "0.12", features = ["borsh"] }
+derive_more = { version = "1.0", features = ["from"] }
+hex-literal = "0.4"
+impl-tools = "0.10"
+itertools = "0.13"
+near-account-id = "1.0"
+near-contract-standards = "5.5"
+near-plugins = { git = "https://github.com/Near-One/near-plugins", rev = "e6e4b070" }
+p256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
+serde_with = "3.9"
 
 [profile.release]
 codegen-units = 1
-opt-level = "s"
+opt-level = 3
 lto = true
 debug = false
+strip = "symbols"
 panic = "abort"
 overflow-checks = true
-

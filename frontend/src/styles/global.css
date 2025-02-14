@@ -1,0 +1,62 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;900&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* If you don't have these set in tailwind.config, you can do a quick CSS var approach: */
+:root {
+  --brandDark: #07111f; /* Example from your homepage’s gradient */
+  --brandMain: #0e2337; /* Another shade for sections */
+  --brandAccent: #4fb6e6; /* Accent color for icons, etc. */
+}
+
+/* Map the custom properties to classes so Tailwind picks them up. 
+   Alternatively, define them in tailwind.config.js under theme.colors. */
+.bg-brandDark {
+  background-color: var(--brandDark) !important;
+}
+
+.bg-brandMain {
+  background-color: var(--brandMain) !important;
+}
+
+.text-brandAccent {
+  color: var(--brandAccent) !important;
+}
+
+.border-brandDark {
+  border-color: var(--brandDark) !important;
+}
+
+.border-brandMain {
+  border-color: var(--brandMain) !important;
+}
+
+/* etc... */
+
+@layer components {
+  .btn {
+    @apply inline-block font-semibold px-4 py-2 rounded-md transition-base;
+  }
+
+  .btn-primary {
+    /* Keep the same style as your homepage “Get Started” button, etc. */
+    @apply bg-brandAccent text-black hover:text-white hover:bg-brandAccent/90;
+  }
+
+  .btn-outline {
+    @apply border border-brandAccent text-brandAccent bg-transparent hover:bg-brandAccent hover:text-black;
+  }
+
+  .card {
+    @apply rounded-md p-4 shadow transition-base;
+    /* Instead of big scale transforms, just do a color or shadow change on hover: */
+  }
+  .card:hover {
+    @apply shadow-md;
+  }
+
+  .transition-base {
+    @apply transition-all duration-300 ease-in-out;
+  }
+}
