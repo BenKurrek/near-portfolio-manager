@@ -7,12 +7,11 @@ import React, {
   ReactNode,
   useCallback,
 } from "react";
-import axios from "axios";
-import { ContractMetadata } from "../utils/models/metadata";
+import { ContractMetadata } from "@utils/models/metadata";
+import { apiService } from "@services/api";
 
 /** Utility to generate a deposit address from the user’s sudo key */
 function generateNearDepositAddress(sudoKey: string) {
-  // Example: Just returns a "fake" near deposit address
   const someHash = sudoKey.slice(8, 16);
   return `dep-${someHash}.intents.near`;
 }
@@ -50,23 +49,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     string | null
   >(null);
 
+  // On mount, check localStorage for token, then call whoami
   useEffect(() => {
     const storedToken = localStorage.getItem("token");
     if (storedToken) {
-      axios
-        .get(`/api/auth/user/whoami?token=${storedToken}`)
-        .then((response) => {
-          const { username, userMetadata } = response.data;
+      apiService
+        .whoami(storedToken)
+        .then((res) => {
+          const { username, userMetadata } = res;
           setUsername(username);
           setToken(storedToken);
           setAccountMetadata(userMetadata);
 
-          // Derive deposit address if we have a sudo key
+          // Derive deposit if user has a sudo_key
           if (userMetadata?.keys?.sudo_key) {
-            const depAddr = generateNearDepositAddress(
-              userMetadata.keys.sudo_key
+            setDerivedDepositAddress(
+              generateNearDepositAddress(userMetadata.keys.sudo_key)
             );
-            setDerivedDepositAddress(depAddr);
           }
         })
         .catch(() => {
@@ -83,20 +82,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       localStorage.setItem("token", tok);
 
       if (metadata?.keys?.sudo_key) {
-        const depAddr = generateNearDepositAddress(metadata.keys.sudo_key);
-        setDerivedDepositAddress(depAddr);
+        setDerivedDepositAddress(
+          generateNearDepositAddress(metadata.keys.sudo_key)
+        );
       }
     },
     []
   );
 
   const logout = useCallback(() => {
+    // We'll also call apiService.logout if needed
+    if (token) {
+      apiService.logout(token).catch(() => {
+        // even if it fails, still clear locally
+      });
+    }
     setUsername(null);
     setToken(null);
     setAccountMetadata(null);
     setDerivedDepositAddress(null);
     localStorage.removeItem("token");
-  }, []);
+  }, [token]);
 
   return (
     <AuthContext.Provider

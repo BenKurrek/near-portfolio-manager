@@ -1,7 +1,7 @@
 // src/utils/intents/flattenTokens.ts
-import { IToken } from "../../constants/tokens";
-import { FlattenedToken } from "../../types/tokens";
-import { isUnifiedToken } from "../typeGuards";
+import { IToken } from "@src/constants/tokens";
+import { FlattenedToken } from "@src/types/tokens";
+import { isUnifiedToken } from "@utils/typeGuards";
 
 export const flattenTokens = (tokens: IToken[]): FlattenedToken[] => {
   const flattened: FlattenedToken[] = [];

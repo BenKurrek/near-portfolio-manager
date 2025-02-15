@@ -1,6 +1,7 @@
-// src/pages/api/inngest/functions/buy-bundle.ts
-import { inngest } from "../main";
-import { updateJobStep } from "../../auth/utils/jobs";
+// src/inngest/functions/buy-bundle.ts
+
+import { inngest } from "@inngest/index";
+import { updateJobStep } from "@src/pages/api/auth/utils/jobs";
 
 export const buyBundle = inngest.createFunction(
   { name: "platform/buy-bundle" },

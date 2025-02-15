@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { loggedInUsers } from "../sessions";
 import { getUserByUsername } from "../utils/user";
 import { createJob } from "../utils/jobs";
-import { inngest } from "../../inngest/main";
+import { inngest } from "@inngest/index";
 
 export default async function handler(
   req: NextApiRequest,

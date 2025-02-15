@@ -1,21 +1,23 @@
-// src/pages/api/inngest/functions/create-portfolio.ts
+// src/inngest/functions/create-portfolio.ts
 
-import { configureNetwork } from "../../../../utils/config";
-import { initNearConnection } from "../../../../utils/services/contractService";
-import { addInngestRunIdToJob, updateJobStep } from "../../auth/utils/jobs";
-import { inngest } from "../main";
-import { getUserByUsername, setUserContractData } from "../../auth/utils/user";
+import { inngest } from "@inngest/index";
+import { configureNetwork } from "@utils/config";
+import { initNearConnection } from "@services/contractService";
+import {
+  addInngestRunIdToJob,
+  updateJobStep,
+} from "@src/pages/api/auth/utils/jobs";
+import {
+  getUserByUsername,
+  setUserContractData,
+} from "@src/pages/api/auth/utils/user";
 import { NonRetriableError } from "inngest";
-import { generateKeyPair } from "../../../../utils/helpers/keyUtils";
-import { ContractMetadata } from "../../../../utils/models/metadata";
+import { generateKeyPair } from "@utils/helpers/keyUtils";
+import { ContractMetadata } from "@utils/models/metadata";
 
-/**
- * Our new "create-portfolio" Inngest function
- * calls `add_user_portfolio` in your contract (no new NEAR account!)
- */
 export const createPortfolio = inngest.createFunction(
   {
-    id: "platform/create-portfolio",
+    name: "Create Portfolio",
     onFailure: ({ event, error }) => {
       const { jobId, username } = event.data.event.data;
       console.error(
@@ -30,20 +32,20 @@ export const createPortfolio = inngest.createFunction(
     logger.info("create-portfolio => input: ", input);
     const { jobId, username } = input;
 
-    // 1) Initialize the job
+    // 1) Initialize job
     addInngestRunIdToJob(jobId, inngestRunId);
     updateJobStep(jobId, "Adding User Portfolio", "in-progress");
 
-    // 2) Get the user
+    // 2) Get user
     const user = await getUserByUsername(username);
     if (!user) throw new NonRetriableError("User not found.");
 
-    // 3) Generate a new “sudo” key
+    // 3) Generate "sudo" key
     logger.info("Generating a new sudo key for user...");
-    const sudoKeyPair = generateKeyPair(); // KeyPair.fromRandom("ed25519");
-    const sudoPublicKey = sudoKeyPair.getPublicKey().toString(); // "ed25519:xxxx"
+    const sudoKeyPair = generateKeyPair();
+    const sudoPublicKey = sudoKeyPair.getPublicKey().toString();
 
-    // 4) Connect to NEAR & call the contract
+    // 4) Connect to NEAR & call contract
     const networkId = process.env.NEXT_PUBLIC_APP_NETWORK_ID! as
       | "testnet"
       | "mainnet";
@@ -53,9 +55,7 @@ export const createPortfolio = inngest.createFunction(
       process.env.NEXT_PUBLIC_NEAR_PLATFORM_SIGNER_ID!
     );
 
-    // Example: calling your existing contract with a method "add_user_portfolio"
-    // that returns { portfolio_id: string } in the result
-    const contractId = process.env.NEXT_PUBLIC_CONTRACT_ID!; // e.g. "portfolios.near"
+    const contractId = process.env.NEXT_PUBLIC_CONTRACT_ID!;
     logger.info(
       `Calling add_user_portfolio(${user.id}, ${sudoPublicKey}) on contract ${contractId}`
     );
@@ -65,42 +65,39 @@ export const createPortfolio = inngest.createFunction(
       methodName: "add_user_portfolio",
       args: {
         user_id: user.id,
-        sudo_pubkey: sudoPublicKey, // e.g. "ed25519:..."
+        sudo_pubkey: sudoPublicKey,
       },
       gas: "300000000000000",
       attachedDeposit: "0",
     });
 
-    // Suppose the contract returns a portfolio_id in successValue
-    // We parse it below (the real code may differ)
+    // 5) Parse result from NEAR
     const outcome = result.status as any;
     if (!("SuccessValue" in outcome)) {
       throw new Error("add_user_portfolio failed or returned no data");
     }
-    // Typically NEAR returns base64
+
     const successValB64 = outcome.SuccessValue;
     const portfolioId = Buffer.from(successValB64, "base64").toString("utf8");
 
     logger.info(`Portfolio created on-chain with ID '${portfolioId}'`);
 
-    // 5) Save the portfolio ID + sudoKey to user
+    // 6) Save the portfolio ID + sudoKey to user
     const userMetadata: ContractMetadata = {
       keys: {
-        // store the entire private key, or just the public portion?
-        // Up to your design, but let's do full “sudo_key” for example
         sudo_key: sudoKeyPair.toString(),
       },
       contracts: {
-        userDepositAddress: "", // if relevant
-        userContractId: portfolioId, // store the “portfolioId” as userContractId
-        mpcContractId: "n/a", // if not used
+        userDepositAddress: "",
+        userContractId: portfolioId,
+        mpcContractId: "n/a",
       },
     };
 
     await setUserContractData(user.id, userMetadata, sudoKeyPair.toString());
     logger.info(`Portfolio ID saved for user '${user.username}'.`);
 
-    // 6) Mark job success
+    // 7) Mark job success
     updateJobStep(jobId, "Adding User Portfolio", "completed");
   }
 );

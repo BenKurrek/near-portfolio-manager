@@ -8,19 +8,18 @@ import React, {
   useCallback,
   useContext,
 } from "react";
-import { AuthContext } from "./AuthContext";
-import { flattenTokens } from "../utils/intents/flattenTokens";
-import { LIST_TOKENS } from "../constants/tokens";
-import { FlattenedToken } from "../types/tokens";
-import { fetchBatchBalances } from "../utils/helpers/nearIntents"; // We'll create this
-import { configureNetwork } from "../utils/config";
+import { AuthContext } from "@context/AuthContext";
+import { flattenTokens } from "@utils/intents/flattenTokens";
+import { LIST_TOKENS } from "@src/constants/tokens";
+import { FlattenedToken } from "@src/types/tokens";
+import { fetchBatchBalances } from "@utils/helpers/nearIntents";
+import { configureNetwork } from "@utils/config";
 
 interface TokenBalance {
   token: FlattenedToken;
   balance: string; // Big string
 }
 
-/** The interface for BalanceContext data */
 interface BalanceContextType {
   balances: TokenBalance[];
   refreshBalances: () => Promise<void>;
@@ -43,10 +42,6 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
 
   const flattened = flattenTokens(LIST_TOKENS);
 
-  /**
-   *  Poll NEAR for batch balances
-   *  If derivedDepositAddress is null, user not logged in
-   */
   const refreshBalances = useCallback(async () => {
     if (!derivedDepositAddress) {
       setBalances([]);
@@ -59,7 +54,6 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
         derivedDepositAddress,
         tokenIds
       );
-      // results is an array of string balances in the same order
       const newBalances: TokenBalance[] = flattened.map((token, idx) => ({
         token,
         balance: results[idx] || "0",
@@ -71,7 +65,6 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, [derivedDepositAddress, flattened, config.nearNodeURL]);
 
-  // Poll every 10 seconds
   useEffect(() => {
     refreshBalances();
     const interval = setInterval(() => {

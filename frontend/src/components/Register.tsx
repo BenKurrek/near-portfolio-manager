@@ -4,8 +4,8 @@ import {
   RegistrationResponseJSON,
 } from "@simplewebauthn/browser";
 import axios from "axios";
-import { ContractMetadata } from "../utils/models/metadata";
-import PasskeyIcon from "../icons/PasskeyIcon";
+import { ContractMetadata } from "@utils/models/metadata";
+import PasskeyIcon from "@src/icons/PasskeyIcon";
 
 interface RegisterProps {
   onRegistered: (token: string) => void;

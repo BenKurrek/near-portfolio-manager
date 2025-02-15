@@ -1,12 +1,12 @@
 // pages/api/auth/user/create-portfolio.ts
 
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getUserByUsername } from "../utils/user";
 import { loggedInUsers } from "../sessions";
-import { ContractMetadata } from "../../../../utils/models/metadata";
+import { ContractMetadata } from "@utils/models/metadata";
 import { createJob } from "../utils/jobs";
-import { inngest } from "../../inngest/main";
-import { CreatePortfolioPayload } from "../../../../utils/models/inngest";
+import { inngest } from "@inngest/index";
+import { CreatePortfolioPayload } from "@utils/models/inngest";
+import { getUserByUsername } from "../utils/user";
 
 interface DeployContractResponse {
   success: boolean;

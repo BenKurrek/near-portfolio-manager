@@ -1,6 +1,9 @@
-import React, { useState } from "react";
-import { ContractMetadata } from "../utils/models/metadata";
-import { AppConfig } from "../utils/config";
+// src/components/AuthenticatedDashboard.tsx
+
+import React, { useContext, useState } from "react";
+import { AuthContext } from "@context/AuthContext";
+import { ContractMetadata } from "@utils/models/metadata";
+import { AppConfig } from "@utils/config";
 import {
   FaPaperPlane,
   FaExchangeAlt,
@@ -12,12 +15,11 @@ import {
 } from "react-icons/fa";
 import { FiCopy } from "react-icons/fi";
 import { BsEye } from "react-icons/bs";
-
-/** Chart Import */
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from "chart.js";
 import { Pie } from "react-chartjs-2";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from "chart.js";
+import { apiService } from "@services/api";
 
-// Register chart.js components
+// Chart.js registration
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
 interface Transaction {
@@ -49,8 +51,29 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
 }) => {
   const [showAllTxs, setShowAllTxs] = useState<boolean>(false);
 
+  // Pull token from AuthContext so we can call private endpoints
+  const { token } = useContext(AuthContext);
+
+  // This is just an example “handleBuyBundle” we can add
+  const handleBuyBundle = async (bundleId: string, amount: number) => {
+    if (!token) {
+      alert("No token found. Please log in first.");
+      return;
+    }
+    try {
+      // Usually you'd update some local job UI or state
+      const response = await apiService.buyBundle(token, bundleId, amount);
+      console.log("buyBundle response => ", response);
+      // You might poll the job or show a "Job in progress" UI
+      alert(`Buy ${bundleId} initiated. jobId=${response.jobId}`);
+    } catch (err) {
+      console.error("Error buying bundle:", err);
+      alert("Failed to buy bundle. Check console for details.");
+    }
+  };
+
   /**
-   * Copy the user’s deposit address to clipboard
+   * Copy the user’s deposit address
    */
   const handleCopyAddress = () => {
     if (!accountMetadata?.contracts?.userDepositAddress) return;
@@ -59,18 +82,14 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Example chart data for the “Portfolio Balancer” pie chart
+  // Sample chart data
   const balancerChartData = {
     labels: ["USDC", "ETH", "Others"],
     datasets: [
       {
         label: "Allocation",
         data: [50, 25, 25],
-        backgroundColor: [
-          "#8ECAE6", // Light blue
-          "#219EBC", // Teal-ish
-          "#FFB703", // Orange
-        ],
+        backgroundColor: ["#8ECAE6", "#219EBC", "#FFB703"],
         borderWidth: 0,
       },
     ],
@@ -78,9 +97,7 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
 
   return (
     <div className="mt-8 space-y-12 text-gray-100 bg-brandDark min-h-screen px-4 py-8">
-      {/** ─────────────────────────────────────────────────────────────────
-       *  TOP USER INFO
-       * ──────────────────────────────────────────────────────────────────*/}
+      {/* TOP USER INFO */}
       <section className="bg-gradient-to-r from-brandDark to-brandMain p-6 rounded-lg shadow space-y-6">
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-6">
           {/* Avatar + Username */}
@@ -144,9 +161,7 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
         </div>
       </section>
 
-      {/** ─────────────────────────────────────────────────────────────────
-       *  BUY BUNDLES
-       * ──────────────────────────────────────────────────────────────────*/}
+      {/* BUY BUNDLES */}
       <section className="max-w-6xl mx-auto space-y-4">
         <h2 className="text-3xl font-bold">Buy Bundles</h2>
         <p className="text-gray-300">
@@ -163,7 +178,12 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
             <p className="text-gray-200">
               A selection of the most stable tokens on the market.
             </p>
-            <button className="btn btn-outline mt-auto">Buy Now</button>
+            <button
+              className="btn btn-outline mt-auto"
+              onClick={() => handleBuyBundle("bluechip", 100)}
+            >
+              Buy Now
+            </button>
           </div>
 
           {/* Memecoin Bundle */}
@@ -175,7 +195,12 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
             <p className="text-gray-200">
               Spice up your portfolio with the market’s most viral memecoins.
             </p>
-            <button className="btn btn-outline mt-auto">Buy Now</button>
+            <button
+              className="btn btn-outline mt-auto"
+              onClick={() => handleBuyBundle("memecoin", 42)}
+            >
+              Buy Now
+            </button>
           </div>
 
           {/* DeFi Powerhouse */}
@@ -187,14 +212,17 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
             <p className="text-gray-200">
               Leading DeFi tokens like AAVE, UNI, and COMP for advanced yields.
             </p>
-            <button className="btn btn-outline mt-auto">Buy Now</button>
+            <button
+              className="btn btn-outline mt-auto"
+              onClick={() => handleBuyBundle("defi", 50)}
+            >
+              Buy Now
+            </button>
           </div>
         </div>
       </section>
 
-      {/** ─────────────────────────────────────────────────────────────────
-       *  PORTFOLIO BALANCER w/ Pie Chart
-       * ──────────────────────────────────────────────────────────────────*/}
+      {/* PORTFOLIO BALANCER */}
       <section className="max-w-6xl mx-auto space-y-6">
         <h2 className="text-3xl font-bold">Portfolio Balancer</h2>
         <p className="text-gray-300">
@@ -202,7 +230,6 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
           rebalancing.
         </p>
 
-        {/* Pie Chart Section */}
         <div className="flex flex-col md:flex-row gap-6 md:items-center mt-4">
           <div className="md:w-1/2 bg-brandMain/20 p-4 rounded-md">
             <Pie
@@ -235,9 +262,7 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
         </div>
       </section>
 
-      {/** ─────────────────────────────────────────────────────────────────
-       *  TRANSACTION HISTORY
-       * ──────────────────────────────────────────────────────────────────*/}
+      {/* TRANSACTION HISTORY */}
       <section className="max-w-6xl mx-auto space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-2xl font-bold">Transaction History</h3>

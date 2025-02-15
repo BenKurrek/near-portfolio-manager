@@ -2,11 +2,14 @@
 //!
 //! Constants and storage keys used by the contract.
 
+use near_sdk::BorshStorageKey;
+
 use crate::*;
 
-#[derive(Clone)]
-#[near(serializers = [json, borsh])]
+#[near]
+#[derive(BorshStorageKey)]
 pub enum StorageKey {
+    OwnerMap,
     AgentKeys,
     PortfolioInfo,
 }

@@ -26,22 +26,33 @@ use utils::*;
 #[near(contract_state, serializers = [borsh])]
 #[derive(PanicOnDefault)]
 pub struct IntentsProxyMpcContract {
-    // Maps a given agent public key to its key data (and access)
+    /// Each user is identified by their "owner public key" => OnChainUser
+    pub owner_map: LookupMap<PublicKey, UserInfo>,
+
+    /// Agent keys are smaller co-owners/AI agents, each with a KeyInfo struct referencing the portfolio
     pub agent_keys: LookupMap<PublicKey, KeyInfo>,
+
+    /// The actual portfolio storage
     pub portfolio_info: LookupMap<PortfolioId, PortfolioInfo>,
 
-    /// The mpc contract that each vault uses to sign transactions
+    /// Global incrementing ID for new portfolios
+    pub global_portfolio_counter: u32,
+
+    /// The MPC contract that each vault uses to sign transactions
     pub mpc_contract_id: AccountId,
 }
 
 #[near]
 impl IntentsProxyMpcContract {
+    /// Initialize the contract with a known MPC contract ID
     #[init]
     pub fn new(mpc_contract_id: AccountId) -> Self {
         Self {
-            mpc_contract_id,
-            portfolio_info: LookupMap::new(StorageKey::PortfolioInfo),
+            owner_map: LookupMap::new(StorageKey::OwnerMap),
             agent_keys: LookupMap::new(StorageKey::AgentKeys),
+            portfolio_info: LookupMap::new(StorageKey::PortfolioInfo),
+            global_portfolio_counter: 0,
+            mpc_contract_id,
         }
     }
 }

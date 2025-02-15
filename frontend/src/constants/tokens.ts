@@ -1,4 +1,4 @@
-import { BaseTokenInfo, UnifiedTokenInfo } from "../utils/models/intents";
+import { BaseTokenInfo, UnifiedTokenInfo } from "@utils/models/intents";
 
 export type IToken = BaseTokenInfo | UnifiedTokenInfo;
 export const BTC_TOKEN_INFO = {

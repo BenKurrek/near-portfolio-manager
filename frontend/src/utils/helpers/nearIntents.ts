@@ -2,7 +2,7 @@ import { randomBytes } from "crypto";
 import { Keypair } from "@solana/web3.js";
 import { default as bs58 } from "bs58";
 import { default as nacl } from "tweetnacl";
-import { configureNetwork } from "../config";
+import { configureNetwork } from "@utils/config";
 
 // src/utils/helpers/nearIntents.ts
 export async function fetchBatchBalances(

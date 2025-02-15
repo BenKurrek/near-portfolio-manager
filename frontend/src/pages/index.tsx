@@ -2,15 +2,14 @@
 
 import { useState, useContext, useEffect } from "react";
 import axios from "axios";
-import { AuthContext } from "../context/AuthContext";
-import { BalanceContext } from "../context/BalanceContext";
-import UnauthenticatedHero from "../components/UnauthenticatedHero";
-import LoadingOverlay from "../components/LoadingOverlay/LoadingOverlay";
-import LoginModal from "../modals/LoginModal";
-import DepositModal from "../modals/DepositModal";
-import AuthenticatedDashboard from "../components/AuthenticatedDashboard";
-
-import { configureNetwork } from "../utils/config";
+import { AuthContext } from "@context/AuthContext";
+import { BalanceContext } from "@context/BalanceContext";
+import UnauthenticatedHero from "@components/UnauthenticatedHero";
+import LoadingOverlay from "@components/LoadingOverlay/LoadingOverlay";
+import LoginModal from "@components/../modals/LoginModal";
+import DepositModal from "@components/../modals/DepositModal";
+import AuthenticatedDashboard from "@components/AuthenticatedDashboard";
+import { configureNetwork } from "@utils/config";
 
 export default function Home() {
   const { username, token, accountMetadata, login, logout } =

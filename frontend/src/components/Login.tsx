@@ -4,7 +4,7 @@ import {
   AuthenticationResponseJSON,
 } from "@simplewebauthn/browser";
 import axios from "axios";
-import { ContractMetadata } from "../utils/models/metadata";
+import { ContractMetadata } from "@utils/models/metadata";
 
 interface LoginProps {
   onLoggedIn: (
