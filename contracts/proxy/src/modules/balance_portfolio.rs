@@ -12,14 +12,12 @@ impl IntentsProxyMpcContract {
         defuse_intents: DefuseIntents,
     ) -> Promise {
         // 1) Check the caller's public key
-        let signer_pk_bytes = env::signer_account_pk();
-        let caller_pubkey = near_sdk::PublicKey::try_from(signer_pk_bytes)
-            .expect("Invalid public key from env::signer_account_pk");
+        let signer_pk = env::signer_account_pk();
 
         // 2) Check if that pubkey is in agent_keys
         let keyinfo = self
             .agent_keys
-            .get(&caller_pubkey)
+            .get(&signer_pk)
             .expect("Caller is not an agent key!");
         // 3) Check that the agent's portfolio_id matches
         assert_eq!(

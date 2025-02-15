@@ -2,7 +2,7 @@ use crate::*;
 
 #[derive(Clone)]
 #[near(serializers = [json, borsh])]
-pub struct WithdrawEphemeral {
+pub struct WithdrawalData {
     /// The user’s public key (the portfolio owner)
     pub owner_pubkey: near_sdk::PublicKey,
     /// The user’s nonce must be strictly greater than the stored nonce
@@ -22,15 +22,16 @@ impl IntentsProxyMpcContract {
     #[payable]
     pub fn withdraw_funds(
         &mut self,
-        ephemeral_json: String,
-        signature: near_sdk::json_types::Base64VecU8,
+        withdrawal_data: WithdrawalData,
+        signature: Base64VecU8,
     ) -> Promise {
-        // 1) Parse ephemeral JSON => `WithdrawEphemeral`
-        let ephemeral: WithdrawEphemeral =
-            near_sdk::serde_json::from_str(&ephemeral_json).expect("Invalid ephemeral JSON");
+        // Verify signature on the ephemeral JSON.
+        let req_bytes = serde_json::to_vec(&withdrawal_data).expect("Serialization failed");
+        let is_valid = verify_signature(&req_bytes, &signature, &withdrawal_data.owner_pubkey);
 
+        require!(is_valid, "Invalid signature on ephemeral payload");
         // 2) Ensure the DefuseIntents are only FtWithdraw
-        for intent in &ephemeral.defuse_intents.intents {
+        for intent in &withdrawal_data.defuse_intents.intents {
             match intent {
                 Intent::FtWithdraw(_) => { /* ok */ }
                 _ => panic!("withdraw_funds only allows FtWithdraw!"),
@@ -40,41 +41,39 @@ impl IntentsProxyMpcContract {
         // 3) Check user (OnChainUser) for ephemeral.owner_pubkey
         let mut user = self
             .owner_map
-            .get(&ephemeral.owner_pubkey)
+            .get(&withdrawal_data.owner_pubkey)
             .cloned()
             .expect("User not found in owner_map");
 
         require!(
-            ephemeral.nonce > user.nonce,
+            withdrawal_data.nonce > user.nonce,
             "Nonce must be greater than stored user nonce"
         );
 
         // 4) Bump the nonce
-        user.nonce = ephemeral.nonce;
+        user.nonce = withdrawal_data.nonce;
 
         // 5) Make sure ephemeral.portfolio_id is actually owned by ephemeral.owner_pubkey
         let pinfo = self
             .portfolio_info
-            .get(&ephemeral.portfolio_id)
+            .get(&withdrawal_data.portfolio_id)
             .expect("Portfolio not found");
         require!(
-            pinfo.owner_key == ephemeral.owner_pubkey,
+            pinfo.owner_key == withdrawal_data.owner_pubkey,
             "Portfolio not owned by ephemeral signer"
         );
 
-        // 6) Optionally verify signature if you want real on-chain ed25519 checks.
-        //    We do the same "erc191" approach for hashing ephemeral, but we can’t do a full verify easily in a NEAR contract unless we have some ed25519 verify logic (not built in).
-        let ephemeral_hash = compute_erc191_hash(&ephemeral);
-        // Typically you'd do something like `env::ed25519_verify(signature, ephemeral_bytes, ephemeral.owner_pubkey)` if you had the raw ephemeral bytes.
+        let intent_hash = compute_erc191_hash(&withdrawal_data.defuse_intents);
 
         // 7) Build the sign payload for the MPC
         let sign_payload = MPCSignPayload {
-            payload: ephemeral_hash,
-            path: public_key_to_string(&ephemeral.owner_pubkey),
+            payload: intent_hash,
+            path: public_key_to_string(&withdrawal_data.owner_pubkey),
             key_version: 0,
         };
         let sign_request_json = near_sdk::serde_json::json!({ "request": sign_payload });
-        self.owner_map.insert(ephemeral.owner_pubkey, user.clone());
+        self.owner_map
+            .insert(withdrawal_data.owner_pubkey, user.clone());
 
         // 8) Call the MPC
         near_sdk::Promise::new(self.mpc_contract_id.clone()).function_call(

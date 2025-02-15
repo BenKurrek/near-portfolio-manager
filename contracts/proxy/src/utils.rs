@@ -48,3 +48,31 @@ where
     let combined = [prefix.as_bytes(), json_str.as_bytes()].concat();
     near_sdk::env::keccak256_array(&combined)
 }
+
+/// Verifies a signature given a payload, a signature (Base64VecU8), and a public key.
+pub fn verify_signature(
+    payload_bytes: &[u8],
+    signature: &Base64VecU8,
+    public_key: &PublicKey,
+) -> bool {
+    // Skip the first byte (curve type).
+    let key_bytes_without_prefix = &public_key.as_bytes()[1..];
+    let key_bytes_array: &[u8; 32] = match key_bytes_without_prefix.try_into() {
+        Ok(arr) => arr,
+        Err(_) => return false,
+    };
+    let sig_bytes = match vec_to_64_byte_array(signature.0.clone()) {
+        Some(bytes) => bytes,
+        None => return false,
+    };
+    env::ed25519_verify(&sig_bytes, payload_bytes, key_bytes_array)
+}
+
+/// Convenience function to verify a single signature.
+pub fn is_single_signature_valid(
+    data: &[u8],
+    public_key: &PublicKey,
+    signature: &Base64VecU8,
+) -> bool {
+    verify_signature(data, signature, public_key)
+}
