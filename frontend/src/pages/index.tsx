@@ -137,7 +137,6 @@ export default function Home() {
             agentIds={accountMetadata.agentIds}
             userBalance={userBalance}
             transactions={[]}
-            config={config}
             copied={copied}
             setCopied={setCopied}
             handleDepositClick={() => setShowDepositModal(true)}

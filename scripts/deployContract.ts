@@ -11,7 +11,7 @@ import { formatNearAmount, parseNearAmount } from "@near-js/utils";
 import fs from "fs";
 
 async function main(): Promise<void> {
-  const networkId = "testnet";
+  const networkId = "mainnet";
 
   // Load environment
   const { sponsorAccountId, envPath, mpcContract } = loadEnv(networkId);
@@ -21,6 +21,7 @@ async function main(): Promise<void> {
   const near = await initNearConnection(config);
   const sponsorAccount = await near.account(sponsorAccountId);
 
+  //@ts-ignore
   const domainSuffix = networkId === "testnet" ? "testnet" : "near";
   const contractId = `proxy-${Date.now()}.${domainSuffix}`;
 

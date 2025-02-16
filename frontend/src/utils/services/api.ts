@@ -24,6 +24,26 @@ export interface JobStep {
  * Our unified API service
  */
 export const apiService = {
+  /**
+   * Get bundle quotes.
+   * @param token - The authentication token.
+   * @param items - An array of quote request items.
+   * Each item should include:
+   *   - defuse_asset_identifier_in
+   *   - defuse_asset_identifier_out
+   *   - exact_amount_in
+   *   - (optional) min_deadline_ms
+   */
+  async getBundleQuotes(token: string, items: any[]) {
+    const res = await client.get("/quote/fetch-quotes", {
+      params: {
+        token,
+        items: JSON.stringify(items), // URL-encode the JSON array
+      },
+    });
+    return res.data; // Expects { quotes: [...] }
+  },
+
   // ------------------- AUTH REGISTER -------------------
   async createUser(username: string) {
     const res = await client.post("/auth/register/create-user", { username });

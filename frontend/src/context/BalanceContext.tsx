@@ -13,6 +13,7 @@ import { flattenTokens } from "@src/utils/intents/flattenTokens";
 import { LIST_TOKENS } from "@src/constants/tokens";
 import { fetchBatchBalances } from "@src/utils/helpers/nearIntents";
 import { configureNetwork } from "@src/utils/config";
+import { FlattenedToken } from "@src/types/tokens";
 
 interface TokenBalance {
   token: any;
@@ -21,11 +22,13 @@ interface TokenBalance {
 
 interface BalanceContextType {
   balances: TokenBalance[];
+  allTokens: FlattenedToken[];
   refreshBalances: () => Promise<void>;
 }
 
 export const BalanceContext = createContext<BalanceContextType>({
   balances: [],
+  allTokens: [],
   refreshBalances: async () => {},
 });
 
@@ -66,6 +69,7 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
         depositAddress,
         tokenIds
       );
+      console.log("results: ", results, "tokenIds: ", tokenIds);
       const newBalances = flattened.map((token, idx) => ({
         token,
         balance: results[idx] || "0",
@@ -84,7 +88,9 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
   }, [refreshBalances]);
 
   return (
-    <BalanceContext.Provider value={{ balances, refreshBalances }}>
+    <BalanceContext.Provider
+      value={{ balances, refreshBalances, allTokens: flattened }}
+    >
       {children}
     </BalanceContext.Provider>
   );

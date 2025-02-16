@@ -6,6 +6,10 @@ import { createJob, updateJobStep } from "@api-utils/jobs";
 import { generatePublicKeyFromTurnKey } from "@api-utils/crypto";
 import { configureNetwork } from "@src/utils/config";
 import { initNearConnection } from "@src/utils/services/contractService";
+import {
+  fetchDepositAddress,
+  generateSolAddress,
+} from "@src/utils/helpers/nearIntents";
 
 export default async function handler(
   req: NextApiRequest,
@@ -97,16 +101,18 @@ export default async function handler(
         return;
       }
 
+      const accountId = generateSolAddress(user.sudoKey);
+      const evmAddr = await fetchDepositAddress("EVM", accountId);
+
       // Suppose contract returns portfolio ID in base64 in SuccessValue
       const portfolioId = Buffer.from(outcome.SuccessValue, "base64").toString(
         "utf8"
       );
-      console.log(`Portfolio created with ID '${portfolioId}'`);
 
       // Optionally update deposit address or anything else
       await prisma.user.update({
         where: { id: user.id },
-        data: { userDepositAddress: "" }, // ...
+        data: { userDepositAddress: evmAddr },
       });
 
       // Create the Portfolio row

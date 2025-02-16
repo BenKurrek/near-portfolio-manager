@@ -126,8 +126,8 @@ export const fetchQuote = async ({
     method: "quote",
     params: [
       {
-        defuse_asset_identifier_in,
-        defuse_asset_identifier_out,
+        defuse_asset_identifier_in: defuse_asset_identifier_in.toLowerCase(),
+        defuse_asset_identifier_out: defuse_asset_identifier_out.toLowerCase(),
         exact_amount_in,
         min_deadline_ms,
       },
@@ -387,6 +387,7 @@ export const signMessage = async (keyString: string, message: string) => {
 };
 
 export const postToSolverRelay2 = async (reqData: any) => {
+  console.log("reqData: ", reqData);
   const res = await fetch("https://solver-relay-v2.chaindefuser.com/rpc", {
     method: "POST",
     headers: {
