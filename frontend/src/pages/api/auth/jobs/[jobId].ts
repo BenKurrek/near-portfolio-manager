@@ -16,8 +16,14 @@ export default async function handler(
   }
 
   const job = await prisma.job.findUnique({ where: { id: jobId } });
-  if (!job) {
+  if (!job || !job.steps)
     return res.status(404).json({ error: "Job not found" });
-  }
-  return res.status(200).json(job);
+
+  // job.steps is a string
+  const stepsAsArray = JSON.parse(job.steps.toString());
+
+  return res.status(200).json({
+    ...job,
+    steps: stepsAsArray,
+  });
 }

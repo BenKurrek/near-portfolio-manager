@@ -3,7 +3,7 @@ import { randomBytes } from "crypto";
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 import nacl from "tweetnacl";
-import { configureNetwork } from "@utils/config";
+import { configureNetwork } from "@src/utils/config";
 
 // Fetch batch balances from NEAR
 export async function fetchBatchBalances(

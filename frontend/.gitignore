@@ -13,6 +13,8 @@
 /out/
 
 .env.*
+prisma/migrations/*
+prisma/dev.db
 
 # production
 /build

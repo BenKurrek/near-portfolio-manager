@@ -11,9 +11,7 @@ export interface JobStep {
   message?: string;
 }
 
-/**
- * Creates a new job record in the database.
- */
+// 1) Create job
 export async function createJob(
   type: string,
   steps: JobStep[],
@@ -22,17 +20,14 @@ export async function createJob(
   const job = await prisma.job.create({
     data: {
       type,
-      // Store as JSON string
-      steps: JSON.stringify(steps),
+      steps: JSON.stringify(steps), // <-- Convert to string
       userId: userId || null,
     },
   });
   return job.id;
 }
 
-/**
- * Updates a given step of a job.
- */
+// 2) Update a job step
 export async function updateJobStep(
   jobId: string,
   stepName: string,
@@ -40,13 +35,13 @@ export async function updateJobStep(
   message?: string
 ): Promise<void> {
   const job = await prisma.job.findUnique({ where: { id: jobId } });
-  if (!job) {
+  if (!job || !job.steps) {
     console.error(`Job with ID ${jobId} not found.`);
     return;
   }
 
-  // Parse the JSON string into an array
-  const steps: JobStep[] = JSON.parse(job.steps || "[]");
+  // steps is stored as string in DB, so parse it
+  const steps: JobStep[] = JSON.parse(job.steps.toString());
 
   const updatedSteps = steps.map((step) =>
     step.name === stepName
@@ -56,22 +51,6 @@ export async function updateJobStep(
 
   await prisma.job.update({
     where: { id: jobId },
-    data: {
-      // Convert array back to a string
-      steps: JSON.stringify(updatedSteps),
-    },
-  });
-}
-
-/**
- * Associates an Inngest run id with a job.
- */
-export async function addInngestRunIdToJob(
-  jobId: string,
-  inngestRunId: string | undefined
-): Promise<void> {
-  await prisma.job.update({
-    where: { id: jobId },
-    data: { inngestRunId },
+    data: { steps: JSON.stringify(updatedSteps) }, // <-- re-stringify
   });
 }

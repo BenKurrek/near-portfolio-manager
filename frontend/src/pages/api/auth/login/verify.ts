@@ -1,29 +1,29 @@
-// src/pages/api/auth/login/verify.ts
+// pages/api/auth/login/verify.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { verifyAuthenticationResponse } from "@simplewebauthn/server";
-import { challenges } from "../challenges";
 import {
   getUserByCredentialId,
   updateAuthenticatorCounter,
-} from "../utils/user";
+} from "@api-utils/user";
+import {
+  getOrCreateGlobalLoginUser,
+  getChallenge,
+  deleteChallenge,
+} from "@api-utils/challenges";
+import { createSession } from "@api-utils/sessions";
 import { v4 as uuidv4 } from "uuid";
-import { loggedInUsers } from "../sessions";
 
-// Define the allowed transport values.
 type AuthenticatorTransportFuture = "usb" | "nfc" | "ble" | "internal";
 
 interface LoginResponse {
   verified: boolean;
   token?: string;
   username?: string;
-  // Return full AuthMetadata
   accountMetadata?: {
     contractMetadata: {
       keys: { sudo_key: string };
       contracts: {
         userDepositAddress: string;
-        userContractId: string;
-        mpcContractId: string;
       };
     };
     portfolioData: any;
@@ -37,43 +37,44 @@ export default async function loginVerifyHandler(
   res: NextApiResponse<LoginResponse>
 ) {
   if (req.method !== "POST") {
-    res.status(405).end();
-    return;
+    return res.status(405).end();
   }
+
   const { assertionResponse } = req.body;
   if (!assertionResponse) {
-    res
+    return res
       .status(400)
       .json({ verified: false, error: "No assertion response provided" });
-    return;
   }
+
   try {
-    const credentialID = assertionResponse.id;
-    const user = await getUserByCredentialId(credentialID);
+    // 1) Find which user has this credential ID
+    const user = await getUserByCredentialId(assertionResponse.id);
     if (!user) {
-      res
+      return res
         .status(400)
         .json({ verified: false, error: "Authenticator not registered" });
-      return;
-    }
-    const expectedChallenge = challenges["global"];
-    if (!expectedChallenge) {
-      res.status(400).json({ verified: false, error: "No challenge found" });
-      return;
     }
 
-    // Find the stored authenticator (stored id and publicKey are base64 strings)
+    // 2) Grab the challenge from the special “global login user”
+    const globalUser = await getOrCreateGlobalLoginUser();
+    const expectedChallenge = await getChallenge(globalUser.id);
+    if (!expectedChallenge) {
+      return res
+        .status(400)
+        .json({ verified: false, error: "No challenge found" });
+    }
+
+    // 3) Prepare the credential info
     const stored = user.authenticators.find(
-      (authr) => authr.id === credentialID
+      (authr) => authr.id === assertionResponse.id
     );
     if (!stored) {
-      res
+      return res
         .status(400)
         .json({ verified: false, error: "No matching credential in user" });
-      return;
     }
 
-    // Build the credential object expected by verifyAuthenticationResponse:
     const credentialForVerification = {
       id: stored.id,
       publicKey: new Uint8Array(Buffer.from(stored.publicKey, "base64")),
@@ -83,6 +84,7 @@ export default async function loginVerifyHandler(
       ),
     };
 
+    // 4) Do the passkey verification
     const verification = await verifyAuthenticationResponse({
       response: assertionResponse,
       expectedChallenge,
@@ -90,32 +92,48 @@ export default async function loginVerifyHandler(
       expectedRPID: process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID!,
       credential: credentialForVerification,
     });
+
     const { verified, authenticationInfo } = verification;
+
     if (verified && authenticationInfo) {
+      // 5) Update the counter
       const { credentialID: authCredentialID, newCounter } = authenticationInfo;
       await updateAuthenticatorCounter(user.id, authCredentialID, newCounter);
+
+      // 6) Delete the global challenge from DB
+      await deleteChallenge(globalUser.id);
+
+      // 7) Create a session
       const token = uuidv4();
-      loggedInUsers[token] = user.username;
-      delete challenges["global"];
+      await createSession(token, user.id);
+
+      // 8) Return user info
       const accountMetadata = {
         contractMetadata: {
           keys: { sudo_key: user.sudoKey || "" },
           contracts: {
             userDepositAddress: user.userDepositAddress || "",
-            userContractId: user.userContractId || "",
-            mpcContractId: user.mpcContractId || "",
           },
         },
         portfolioData: user.portfolios,
-        agentIds: user.agents.map((agent) => agent.publicKey), // adjust as needed
+        agentIds: user.agents.map((agent) => agent.publicKey),
       };
-      res
-        .status(200)
-        .json({ verified, token, username: user.username, accountMetadata });
+
+      return res.status(200).json({
+        verified: true,
+        token,
+        username: user.username,
+        accountMetadata,
+      });
     } else {
-      res.status(200).json({ verified: false, error: "Verification failed" });
+      return res
+        .status(200)
+        .json({ verified: false, error: "Verification failed" });
     }
   } catch (error: any) {
-    res.status(400).json({ verified: false, error: "Authentication failed" });
+    console.error(error);
+    return res
+      .status(400)
+      .json({ verified: false, error: "Authentication failed" });
   }
 }

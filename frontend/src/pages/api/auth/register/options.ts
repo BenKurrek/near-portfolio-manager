@@ -1,8 +1,8 @@
 // src/pages/api/auth/register/options.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { generateRegistrationOptions } from "@simplewebauthn/server";
-import { challenges } from "../challenges";
-import { getUserByUsername } from "../utils/user";
+import { getUserByUsername } from "@api-utils/user";
+import { upsertChallenge } from "@api-utils/challenges";
 
 export default async function handler(
   req: NextApiRequest,
@@ -43,9 +43,10 @@ export default async function handler(
         ),
       })),
     });
-    challenges[username] = options.challenge;
+    await upsertChallenge(user.id, options.challenge);
     res.status(200).json(options);
   } catch (error: any) {
+    console.error(error);
     res.status(500).json({ error: "Failed to generate registration options" });
   }
 }

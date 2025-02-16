@@ -1,23 +1,23 @@
 # Use an official Node.js 18 LTS image based on Alpine Linux
 FROM node:18-alpine
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy only package files first to leverage Docker caching
+# Copy package files and the Prisma folder
 COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma
 
-# Install pnpm globally and install dependencies
 RUN npm install -g pnpm && pnpm install
+
+# Generate the Prisma client (explicitly specifying the schema location)
+RUN pnpm prisma generate --schema=./prisma/schema.prisma
 
 # Copy the rest of the application source code
 COPY . .
 
-# Build the Next.js app using Turbo (or your chosen build command)
+# Build the Next.js app using Turbo
 RUN pnpm turbo run build
 
-# Expose ports for Next.js (3000) and Inngest dev server (3001)
 EXPOSE 3000 3001
 
-# Start the development server (using concurrently/in package.json to run both Next.js and Inngest)
 CMD ["pnpm", "dev"]

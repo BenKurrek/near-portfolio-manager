@@ -1,7 +1,7 @@
 // src/utils/typeGuards.ts
 
 import { IToken } from "@src/constants/tokens";
-import { BaseTokenInfo, UnifiedTokenInfo } from "@utils/models/intents";
+import { BaseTokenInfo, UnifiedTokenInfo } from "@src/utils/models/intents";
 
 /**
  * Type guard to check if a token is UnifiedTokenInfo

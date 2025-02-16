@@ -1,124 +1,90 @@
 // src/pages/index.tsx
-
 import { useState, useContext } from "react";
-import axios from "axios";
 import { AuthContext } from "@context/AuthContext";
 import { BalanceContext } from "@context/BalanceContext";
+import { JobContext } from "@context/JobContext";
 import UnauthenticatedHero from "@components/UnauthenticatedHero";
-import LoadingOverlay from "@components/LoadingOverlay/LoadingOverlay";
 import LoginModal from "@modals/LoginModal";
 import DepositModal from "@modals/DepositModal";
 import AuthenticatedDashboard from "@components/AuthenticatedDashboard";
-import { configureNetwork } from "@utils/config";
+import LoadingOverlay from "@components/LoadingOverlay/LoadingOverlay";
 import type { AuthMetadata } from "@context/AuthContext";
+import { configureNetwork } from "@src/utils/config";
+import { logger } from "@src/utils/logger";
+import { apiService } from "@services/api";
 
 export default function Home() {
   const { username, token, accountMetadata, login, logout } =
     useContext(AuthContext);
 
-  // Get balances from BalanceContext
+  // JobContext for background job handling
+  const { currentJobId, jobSteps, startJob, clearJob } = useContext(JobContext);
+
+  // BalanceContext for user token balances
   const { balances } = useContext(BalanceContext);
   const usdcItem = balances.find((b) => b.token.symbol === "USDC");
   const userBalance = parseFloat(usdcItem?.balance || "0");
 
-  /** -------------- States for job polling + modals -------------- */
-  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const [jobSteps, setJobSteps] = useState<
-    {
-      name: string;
-      status: "pending" | "in-progress" | "completed" | "failed";
-      message?: string;
-    }[]
-  >([]);
-  const [txHash, setTxHash] = useState<string | null>(null);
-
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showDepositModal, setShowDepositModal] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [txHash, setTxHash] = useState<string | null>(null);
 
   const config = configureNetwork(
     process.env.NEXT_PUBLIC_APP_NETWORK_ID as "testnet" | "mainnet"
   );
 
-  // Example logout
   const handleLogout = async () => {
     if (!token) return;
     try {
-      await axios.post("/api/auth/logout", { token });
+      logger.info("Logging out user...");
       logout();
     } catch (error) {
-      console.error("Logout failed:", error);
+      logger.error("Logout failed:", error);
       logout();
     }
   };
 
-  // Example job polling
-  const pollJobStatus = (jobId: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await axios.get(`/api/auth/jobs/${jobId}`);
-        const job = res.data;
-
-        // job.steps is a JSON string in the DB, so you might parse it or
-        // ensure your job fetch route returns the parsed array. If that route
-        // returns the raw string, parse it here. But it looks like it might
-        // return them as a string. Adjust as needed if your route changed.
-        const steps =
-          typeof job.steps === "string" ? JSON.parse(job.steps) : job.steps;
-
-        setJobSteps(steps);
-
-        const isCompleted = steps.every(
-          (step: any) => step.status === "completed" || step.status === "failed"
-        );
-        if (isCompleted) {
-          clearInterval(interval);
-          setCurrentJobId(null);
-          setTxHash(null);
-        }
-      } catch (error) {
-        console.error("Error polling job status:", error);
-        clearInterval(interval);
-      }
-    }, 1000);
-  };
-
-  // Callback for when a user finishes registration
-  const handleRegistered = async (token: string) => {
-    // Example: automatically create a portfolio job after user registration
-    setJobSteps([]);
-    setTxHash(null);
-    setCurrentJobId(null);
+  /**
+   * BUGFIX: Callback for when user finishes registration.
+   * - We'll call whoami with the freshToken,
+   * - Put user in AuthContext with `login(...)`,
+   * - Then optionally begin a "create-portfolio" job in the background.
+   */
+  const handleRegistered = async (freshToken: string) => {
+    logger.info("handleRegistered() -> new user token:", freshToken);
+    setShowLoginModal(false);
 
     try {
-      // If you want to do some “deploy portfolio” logic:
-      const deployResponse = await axios.post(
-        "/api/auth/user/create-portfolio",
-        {
-          token,
-          ownerPubkey: "SOME_PUBKEY", // or get from the user
-        }
-      );
+      // Option 1: Fetch whoami first if you need the user data
+      logger.info("Fetching whoami after registration...");
+      const data = await apiService.whoami(freshToken);
+      logger.info("whoami response after registration:", data);
 
-      if (deployResponse.data.success && deployResponse.data.jobId) {
-        const jobId = deployResponse.data.jobId;
-        setCurrentJobId(jobId);
-        setJobSteps([{ name: "Creating Portfolio", status: "pending" }]);
-        setShowLoginModal(false);
-        pollJobStatus(jobId);
-      }
-    } catch (error) {
-      console.error("Deployment error:", error);
+      // Option 2: Start the portfolio job and wait for it to finish
+      logger.info(
+        "Starting create-portfolio job and waiting for completion..."
+      );
+      await startJob("create-portfolio", freshToken);
+
+      // Now that the job is finished, log the user in
+      login(data.username, freshToken, data.userMetadata);
+      logger.info("User is now logged in after portfolio creation.");
+    } catch (err) {
+      logger.error("Error finalizing registration or creating portfolio:", err);
+      // Optionally, show an error message to the user
     }
   };
 
-  // Callback for when a user logs in
+  /**
+   * Callback for when a user logs in
+   */
   const handleLoggedIn = (
     uname: string,
     tok: string,
     userMetadata: AuthMetadata
   ) => {
-    // Now we only pass three arguments to login, as we updated the signature
+    logger.info("handleLoggedIn() -> user:", uname);
     login(uname, tok, userMetadata);
     setShowLoginModal(false);
   };
@@ -167,15 +133,10 @@ export default function Home() {
           <AuthenticatedDashboard
             username={username}
             accountMetadata={accountMetadata.contractMetadata}
-            /**
-             * We pass the arrays from accountMetadata
-             * If your whoami is returning userMetadata: { contractMetadata, portfolioData, agentIds }
-             * then you can do:
-             */
             portfolioData={accountMetadata.portfolioData}
             agentIds={accountMetadata.agentIds}
             userBalance={userBalance}
-            transactions={[]} // Example empty transaction array
+            transactions={[]}
             config={config}
             copied={copied}
             setCopied={setCopied}
@@ -198,12 +159,12 @@ export default function Home() {
           onClose={() => setShowDepositModal(false)}
         />
 
-        {/* OPTIONAL LOADING OVERLAY */}
+        {/* LOADING OVERLAY: if a background job is in progress */}
         {currentJobId && (
           <LoadingOverlay
             steps={jobSteps}
             onComplete={() => {
-              setCurrentJobId(null);
+              clearJob();
               setTxHash(null);
             }}
             txHash={txHash}
@@ -212,7 +173,6 @@ export default function Home() {
         )}
       </main>
 
-      {/* FOOTER */}
       <footer className="bg-brandDark mt-8 py-6 text-center text-sm text-gray-400">
         &copy; {new Date().getFullYear()} Fluxfolio. All rights reserved.
       </footer>

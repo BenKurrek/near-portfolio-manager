@@ -1,7 +1,7 @@
 // src/services/api.ts
 
 import axios, { AxiosInstance } from "axios";
-import { ContractMetadata } from "@utils/models/metadata";
+import { ContractMetadata } from "@src/utils/models/metadata";
 
 /**
  * Create a pre-configured axios instance
@@ -83,33 +83,43 @@ export const apiService = {
       createdAt: number;
       updatedAt: number;
       returnValue?: any;
-      inngestRunId?: string;
+      // Removed any `inngestRunId` reference
     };
   },
 
-  // ------------------- PORTFOLIO + BUNDLES -------------------
+  /** Create portfolio (no more passing a pubkey) */
   async createPortfolio(token: string) {
     const res = await client.post("/auth/user/create-portfolio", { token });
-    return res.data; // { success, message, jobId? }
+    return res.data; // { success, message, jobId, portfolioId }
   },
 
+  /**
+   * “Buy a bundle” is effectively the same or calls the same `balance_portfolio`.
+   */
   async buyBundle(token: string, bundleId: string, amount: number) {
     const res = await client.post("/auth/user/buy-bundle", {
       token,
       bundleId,
       amount,
     });
-    return res.data; // { success, jobId, message }
+    return res.data;
   },
 
+  /**
+   * Rebalance with some new allocations.
+   * We'll let the backend figure out agent assignment and call `balance_portfolio`.
+   */
   async rebalance(token: string, newAllocations: Record<string, number>) {
     const res = await client.post("/auth/user/rebalance", {
       token,
       newAllocations,
     });
-    return res.data; // { success, jobId }
+    return res.data;
   },
 
+  /**
+   * “Withdraw” calls our ephemeral signing route.
+   */
   async withdraw(
     token: string,
     asset: string,
@@ -122,7 +132,7 @@ export const apiService = {
       amount,
       toAddress,
     });
-    return res.data; // { success, jobId }
+    return res.data;
   },
 
   // E.g. Add AI Agent

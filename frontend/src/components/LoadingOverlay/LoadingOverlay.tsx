@@ -18,9 +18,12 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   txHash,
   explorerLink,
 }) => {
-  const isCompleted = steps.every(
-    (step) => step.status === "completed" || step.status === "failed"
-  );
+  // Only consider the job complete if there is at least one step
+  const isCompleted =
+    steps.length > 0 &&
+    steps.every(
+      (step) => step.status === "completed" || step.status === "failed"
+    );
   const hasFailed = steps.some((step) => step.status === "failed");
   const [animationState, setAnimationState] = useState<
     "loading" | "success" | "failure"

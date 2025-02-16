@@ -1,28 +1,28 @@
 // pages/api/auth/logout.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { loggedInUsers } from "./sessions";
+import { deleteSession, getSession } from "@api-utils/sessions"; // your path
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse,
+  res: NextApiResponse
 ) {
-  console.log("Logout request received.");
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
   const { token } = req.body;
-
-  if (!token || typeof token !== "string") {
-    console.error("Logout failed: No token provided.");
-    res.status(400).json({ error: "No token provided" });
-    return;
+  if (!token) {
+    return res.status(400).json({ error: "No token provided" });
   }
 
-  if (loggedInUsers[token]) {
-    const username = loggedInUsers[token];
-    delete loggedInUsers[token];
-    console.log(`User '${username}' logged out successfully.`);
-    res.status(200).json({ message: "Logged out" });
-  } else {
-    console.warn(`Logout attempt with invalid token: ${token}`);
-    res.status(400).json({ error: "Invalid token" });
+  // Check if session exists
+  const session = await getSession(token);
+  if (!session) {
+    return res.status(400).json({ error: "Invalid or already-expired token" });
   }
+
+  // Delete the session
+  await deleteSession(token);
+  console.log(`User '${session.userId}' logged out successfully.`);
+  return res.status(200).json({ message: "Logged out" });
 }

@@ -8,7 +8,8 @@
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "build": "./build.sh"
+    "build": "./build.sh",
+    "deploy:proxy": "ts-node scripts/deployContract.ts"
   },
   "dependencies": {
     "@keypom/core": "^1.0.6",

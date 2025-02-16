@@ -6,12 +6,13 @@ import React, {
   ReactNode,
   useCallback,
   useContext,
+  useMemo,
 } from "react";
 import { AuthContext } from "@context/AuthContext";
-import { flattenTokens } from "@utils/intents/flattenTokens";
+import { flattenTokens } from "@src/utils/intents/flattenTokens";
 import { LIST_TOKENS } from "@src/constants/tokens";
-import { fetchBatchBalances } from "@utils/helpers/nearIntents";
-import { configureNetwork } from "@utils/config";
+import { fetchBatchBalances } from "@src/utils/helpers/nearIntents";
+import { configureNetwork } from "@src/utils/config";
 
 interface TokenBalance {
   token: any;
@@ -32,14 +33,26 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const { accountMetadata } = useContext(AuthContext);
-  // Read deposit address from the structured metadata
-  const depositAddress =
-    accountMetadata?.contractMetadata?.contracts.userDepositAddress || "";
-  const [balances, setBalances] = useState<TokenBalance[]>([]);
-  const config = configureNetwork(
-    process.env.NEXT_PUBLIC_APP_NETWORK_ID as "testnet" | "mainnet"
+
+  // Memoize the deposit address so it doesn't change every render.
+  const depositAddress = useMemo(
+    () => accountMetadata?.contractMetadata?.contracts.userDepositAddress || "",
+    [accountMetadata]
   );
-  const flattened = flattenTokens(LIST_TOKENS);
+
+  const [balances, setBalances] = useState<TokenBalance[]>([]);
+
+  // Memoize the network config so it doesn't change on every render.
+  const config = useMemo(
+    () =>
+      configureNetwork(
+        process.env.NEXT_PUBLIC_APP_NETWORK_ID as "testnet" | "mainnet"
+      ),
+    []
+  );
+
+  // Memoize the flattened tokens (LIST_TOKENS is a constant so this will be stable).
+  const flattened = useMemo(() => flattenTokens(LIST_TOKENS), []);
 
   const refreshBalances = useCallback(async () => {
     if (!depositAddress) {

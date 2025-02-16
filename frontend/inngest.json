@@ -1,5 +1,0 @@
-{
-  "$schema": "https://raw.githubusercontent.com/inngest/inngest/main/packages/inngest-cli/schema.json",
-  "source": "./src/inngest/functions/**/*.{ts,js}",
-  "buildCommand": "tsc --project tsconfig.json"
-}

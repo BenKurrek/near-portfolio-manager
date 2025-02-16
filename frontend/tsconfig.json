@@ -24,14 +24,11 @@
       "@src/*": [
         "src/*"
       ],
-      "@utils/*": [
-        "src/utils/*"
+      "@api-utils/*": [
+        "src/pages/api/auth/utils/*"
       ],
       "@services/*": [
         "src/utils/services/*"
-      ],
-      "@inngest/*": [
-        "src/inngest/*"
       ],
       "@context/*": [
         "src/context/*"
@@ -44,13 +41,12 @@
       ]
     }
   },
+  "exclude": [
+    "node_modules"
+  ],
   "include": [
-    "globals.d.ts",
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx"
-  ],
-  "exclude": [
-    "node_modules"
   ]
 }

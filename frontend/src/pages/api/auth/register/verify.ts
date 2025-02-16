@@ -1,38 +1,44 @@
-// src/pages/api/auth/register/verify.ts
+// pages/api/auth/register/verify.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
   VerifiedRegistrationResponse,
   verifyRegistrationResponse,
 } from "@simplewebauthn/server";
-import { challenges } from "../challenges";
-import { addAuthenticatorToUser, getUserByUsername } from "../utils/user";
+import { getUserByUsername, addAuthenticatorToUser } from "@api-utils/user";
+import { getChallenge, deleteChallenge } from "@api-utils/challenges";
+import { createSession } from "@api-utils/sessions";
 import { v4 as uuidv4 } from "uuid";
-import { loggedInUsers } from "../sessions";
 
 export default async function registerVerifyHandler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== "POST") {
-    res.status(405).end();
-    return;
+    return res.status(405).end();
   }
+
   const { username, attestationResponse } = req.body;
   if (!username || !attestationResponse) {
-    res.status(400).json({ error: "Missing username or attestationResponse." });
-    return;
+    return res
+      .status(400)
+      .json({ error: "Missing username or attestationResponse." });
   }
+
   const user = await getUserByUsername(username);
   if (!user) {
-    res.status(400).json({ error: "User not found" });
-    return;
+    return res.status(400).json({ error: "User not found" });
   }
-  const expectedChallenge = challenges[username];
+
+  // 1) Retrieve the challenge from DB
+  const expectedChallenge = await getChallenge(user.id);
   if (!expectedChallenge) {
-    res.status(400).json({ error: "No challenge for this user" });
-    return;
+    return res
+      .status(400)
+      .json({ error: "No stored challenge found for this user" });
   }
+
   try {
+    // 2) Verify
     const verification: VerifiedRegistrationResponse =
       await verifyRegistrationResponse({
         response: attestationResponse,
@@ -41,28 +47,31 @@ export default async function registerVerifyHandler(
         expectedRPID: process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID!,
         requireUserVerification: true,
       });
+
     const { verified, registrationInfo } = verification;
+
     if (verified && registrationInfo) {
+      // 3) Add the credential to DB
       const { credential } = registrationInfo;
-      try {
-        await addAuthenticatorToUser(user.id, {
-          id: credential.id,
-          publicKey: credential.publicKey.toString(),
-          counter: credential.counter,
-          transports: attestationResponse.transports,
-        });
-      } catch (error: any) {
-        res.status(400).json({ error: error.message });
-        return;
-      }
+      await addAuthenticatorToUser(user.id, {
+        id: credential.id,
+        publicKey: credential.publicKey.toString(),
+        counter: credential.counter,
+        transports: attestationResponse.transports,
+      });
+
+      // 4) Delete the challenge from DB
+      await deleteChallenge(user.id);
+
+      // 5) Create a new session token
       const token = uuidv4();
-      loggedInUsers[token] = username;
-      delete challenges[username];
-      res.status(200).json({ verified, token });
+      await createSession(token, user.id);
+
+      return res.status(200).json({ verified: true, token });
     } else {
-      res.status(200).json({ verified: false });
+      return res.status(200).json({ verified: false });
     }
   } catch (error) {
-    res.status(400).json({ error: "Verification failed" });
+    return res.status(400).json({ error: "Verification failed" });
   }
 }

@@ -2,29 +2,37 @@
 
 import { InMemoryKeyStore } from "near-api-js/lib/key_stores";
 import { KeyPair, Near } from "near-api-js";
+import { KeyPairString } from "near-api-js/lib/utils";
 
-/**
- * Initializes the NEAR connection.
- * @returns Initialized Near instance.
- */
 export async function initNearConnection(
   networkId: string,
-  nodeUrl: string
+  nodeUrl: string,
+  extraKeys?: Record<string, KeyPair>
 ): Promise<Near> {
   const keyStore = new InMemoryKeyStore();
+
+  // Add your platform signer
   await keyStore.setKey(
     networkId,
     process.env.NEXT_PUBLIC_NEAR_PLATFORM_SIGNER_ID!,
-    //@ts-ignore
-    KeyPair.fromString(process.env.NEXT_PUBLIC_NEAR_PLATFORM_SIGNER_KEY!)
+    KeyPair.fromString(
+      process.env.NEXT_PUBLIC_NEAR_PLATFORM_SIGNER_KEY! as KeyPairString
+    )
   );
 
+  // If we’re also passing any agent key(s), store them
+  if (extraKeys) {
+    for (const [pubKey, keyPair] of Object.entries(extraKeys)) {
+      // We can treat the pubKey as an “accountId” for local usage
+      await keyStore.setKey(networkId, pubKey, keyPair);
+    }
+  }
+
   const nearConfig = {
-    networkId: networkId,
+    networkId,
     nodeUrl,
     keyStore,
   };
-  console.log("Near connection initialized: ", nearConfig);
-  const near = new Near(nearConfig);
-  return near;
+
+  return new Near(nearConfig);
 }

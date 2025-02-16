@@ -1,8 +1,8 @@
 // src/components/AuthenticatedDashboard.tsx
 import React, { useContext, useState } from "react";
-import axios from "axios";
 import { AuthContext } from "@context/AuthContext";
-import { AppConfig } from "@utils/config";
+import { apiService } from "@services/api";
+import { AppConfig } from "@src/utils/config";
 import {
   FaUserAlt,
   FaDollarSign,
@@ -57,15 +57,12 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
       return;
     }
     try {
-      const response = await axios.post("/api/auth/user/buy-bundle", {
-        token,
-        bundleId: bundleType,
-        amount,
-      });
-      if (response.data.success) {
-        alert(`Buy bundle initiated. Job ID: ${response.data.jobId}`);
+      const response = await apiService.buyBundle(token, bundleType, amount);
+      if (response.success) {
+        alert(`Buy bundle initiated. Job ID: ${response.jobId}`);
+        // If you need to poll that job, you could do `startJob('buy-bundle', token)` or something similar
       } else {
-        alert(`Failed to buy bundle: ${response.data.message}`);
+        alert(`Failed to buy bundle: ${response.message}`);
       }
     } catch (error) {
       console.error("Error buying bundle:", error);

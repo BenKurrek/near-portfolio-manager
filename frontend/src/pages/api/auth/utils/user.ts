@@ -1,7 +1,7 @@
 // src/pages/api/auth/utils/user.ts
 import prisma from "@src/db";
 import type { Portfolio, User as PrismaUser, Agent } from "@prisma/client";
-import type { ContractMetadata } from "@utils/models/metadata";
+import { KeyPair } from "near-api-js";
 
 /**
  * We'll define how each authenticator looks in code.
@@ -54,7 +54,7 @@ export async function getUserByUsername(
 
   return {
     ...user,
-    authenticators: parseAuthenticators(user.authenticators),
+    authenticators: parseAuthenticators(user.authenticators?.toString()),
   };
 }
 
@@ -68,7 +68,7 @@ export async function getUserByCredentialId(
     include: { portfolios: true, agents: true },
   });
   for (const user of users) {
-    const auths = parseAuthenticators(user.authenticators);
+    const auths = parseAuthenticators(user.authenticators?.toString());
     if (auths.some((auth) => auth.id === credentialID)) {
       return { ...user, authenticators: auths };
     }
@@ -77,17 +77,24 @@ export async function getUserByCredentialId(
 }
 
 /**
- * Create a new user with empty "[]" for authenticators (JSON string).
+ * Create a new user with an empty "[]" for authenticators,
+ * PLUS generate and store a random ED25519 key in `sudoKey`.
  */
 export async function addUser(username: string): Promise<ExtendedUser> {
   const normalizedUsername = username.toLowerCase();
+
+  // Generate a new random ED25519 key pair so the user always has a sudoKey
+  const keyPair = KeyPair.fromRandom("ed25519");
+
   const user = await prisma.user.create({
     data: {
       username: normalizedUsername,
       authenticators: "[]", // store as JSON string
+      sudoKey: keyPair.toString(), // store the random private key
     },
     include: { portfolios: true, agents: true },
   });
+
   return {
     ...user,
     authenticators: [],
@@ -106,7 +113,7 @@ export async function addAuthenticatorToUser(
   if (!user) throw new Error("User not found.");
 
   const currentStr = user.authenticators || "[]";
-  const currentAuths = parseAuthenticators(currentStr);
+  const currentAuths = parseAuthenticators(currentStr?.toString());
   currentAuths.push(authenticator);
 
   await prisma.user.update({
@@ -122,22 +129,21 @@ export async function addAuthenticatorToUser(
 }
 
 /**
- * Set contract data for the user (like deposit address, contract IDs, etc.).
+ * Optionally, if you have a contract that returns a deposit address after creation,
+ * store that in userDepositAddress:
  */
 export async function setUserContractData(
   userId: string,
-  contractMetadata: ContractMetadata,
-  turnKey: string
+  contractMetadata: {
+    sudo_key: string;
+    userDepositAddress: string;
+  }
 ): Promise<void> {
   await prisma.user.update({
     where: { id: userId },
     data: {
-      sudoKey: contractMetadata.keys.sudo_key,
-      userDepositAddress: contractMetadata.contracts.userDepositAddress,
-      userContractId: contractMetadata.contracts.userContractId,
-      mpcContractId: contractMetadata.contracts.mpcContractId,
-      nearAccountId: contractMetadata.contracts.userContractId,
-      turnKey,
+      sudoKey: contractMetadata.sudo_key,
+      userDepositAddress: contractMetadata.userDepositAddress,
     },
   });
   console.log(`Contract data set for user ID '${userId}'.`);
@@ -154,7 +160,7 @@ export async function updateAuthenticatorCounter(
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error("User not found.");
 
-  const currentAuths = parseAuthenticators(user.authenticators);
+  const currentAuths = parseAuthenticators(user.authenticators?.toString());
   const updated = currentAuths.map((auth) =>
     auth.id === credentialID ? { ...auth, counter: newCounter } : auth
   );

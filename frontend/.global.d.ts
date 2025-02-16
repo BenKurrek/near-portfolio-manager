@@ -1,4 +1,4 @@
-// global.d.ts
+// .global.d.ts
 export {}; // Ensures the file is treated as a module
 
 declare global {
@@ -26,10 +26,7 @@ declare global {
    * Represents the contract data.
    */
   interface ContractData {
-    userContractId: string;
-    userBtcAddress: string;
-    mpcContractId: string;
-    publicKeyHex: string;
+    userDepositAddress: string;
   }
 
   /**
@@ -44,9 +41,7 @@ declare global {
     id: string;
     username: string;
     authenticators: Authenticator[];
-    nearAccountId?: string | null;
+    // Removed: nearAccountId, turnKey, recoveryKey
     contractMetadata: ContractMetadata | null;
-    turnKey?: string | null;
-    recoveryKey?: string | null;
   }
 }
