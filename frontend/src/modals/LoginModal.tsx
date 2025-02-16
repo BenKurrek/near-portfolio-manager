@@ -2,13 +2,13 @@
 import React from "react";
 import Login from "../components/Login";
 import Register from "../components/Register";
-import { ContractMetadata } from "../utils/models/metadata";
+import type { AuthMetadata } from "@context/AuthContext";
 
 interface LoginModalProps {
   handleLoggedIn: (
     username: string,
     token: string,
-    accountMetadata: ContractMetadata
+    userMetadata: AuthMetadata
   ) => void;
   handleRegistered: (token: string) => void;
   setShowModal: React.Dispatch<React.SetStateAction<boolean>>;
@@ -45,7 +45,6 @@ const LoginModal: React.FC<LoginModalProps> = ({
             <Register
               onRegistered={(token: string) => {
                 handleRegistered(token);
-                // setShowModal(false);
               }}
             />
           </div>
@@ -59,9 +58,9 @@ const LoginModal: React.FC<LoginModalProps> = ({
               onLoggedIn={(
                 username: string,
                 token: string,
-                metadata: ContractMetadata
+                userMetadata: AuthMetadata
               ) => {
-                handleLoggedIn(username, token, metadata);
+                handleLoggedIn(username, token, userMetadata);
                 setShowModal(false);
               }}
             />

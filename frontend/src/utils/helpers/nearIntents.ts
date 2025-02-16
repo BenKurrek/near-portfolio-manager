@@ -1,10 +1,11 @@
+// src/utils/helpers/nearIntents.ts
 import { randomBytes } from "crypto";
 import { Keypair } from "@solana/web3.js";
-import { default as bs58 } from "bs58";
-import { default as nacl } from "tweetnacl";
+import bs58 from "bs58";
+import nacl from "tweetnacl";
 import { configureNetwork } from "@utils/config";
 
-// src/utils/helpers/nearIntents.ts
+// Fetch batch balances from NEAR
 export async function fetchBatchBalances(
   nodeUrl: string,
   depositAddress: string,
@@ -53,9 +54,7 @@ export async function fetchBatchBalances(
 }
 
 /**
- * Estimate fee based on current fee rates and transaction size.
- * @param baseFeeRate - Fee rate in satoshis per byte.
- * @returns NEAR Intents eposit address.
+ * Fetch the deposit address based on the active tab and account id.
  */
 export const fetchDepositAddress = async (
   activeTab: "Solana" | "EVM" | "bitcoin",
@@ -105,6 +104,7 @@ export interface Quote {
   expiration_time: string;
   quote_hash: string;
 }
+
 export const fetchQuote = async ({
   defuse_asset_identifier_in,
   defuse_asset_identifier_out,
@@ -140,16 +140,7 @@ export const fetchQuote = async ({
 };
 
 /**
- * Helper function to construct swap or withdraw intents. If withdrawl address is provided, funds will settle there.
- * @param defuse_asset_identifier_in - Asset input, ex: "nep141:base.omft.near".
- * @param defuse_asset_identifier_out - Asset output, ex: "nep141:btc.omft.near".
- * @param amount_in - Amount of tokens input, from quote.
- * @param amount_out - Amount of tokens output, from quote.
- * @param deadline - Deadline for the transaction, from quote.
- * @param signer - Signer account secret key, to be changed to public key.
- * @param quote_hash - Hash of the quote.
- * @param withdraw_address - OPTIONAL, address to withdraw to.
- * @returns Signed Data minus signature, intents message (TO BE SIGNED) and quote hashes, must add signature to publish intent.
+ * Prepare an intent for swapping or withdrawing tokens.
  */
 export const prepareIntent = async ({
   defuse_asset_identifier_in,
@@ -229,10 +220,7 @@ export const prepareIntent = async ({
 };
 
 /**
- * Helper function to swap or withdraw tokens to vault. If withdrawl address is provided, funds will settle there.
- * @param quote_hashes - Array of quote hashes.
- * @param signed_data - Signed data minus signature and quote hashes, must add signature to publish intent.
- * @returns Intent Hash of the published intent.
+ * Publish the intent.
  */
 export const publishIntent = async ({
   quote_hashes,
@@ -393,8 +381,9 @@ export const signMessage = async (keyString: string, message: string) => {
   // Step 4: Sign the message using the private key
   const signature = nacl.sign.detached(messageBytes, privateKeyBytes);
 
-  // Step 5: Return the signature as a Base58-encoded string
-  return bs58.encode(Buffer.from(signature));
+  // Step 5: Return the signature as a Base58-encoded string.
+  // Since 'signature' is already a Uint8Array, we pass it directly.
+  return bs58.encode(signature);
 };
 
 export const postToSolverRelay2 = async (reqData: any) => {

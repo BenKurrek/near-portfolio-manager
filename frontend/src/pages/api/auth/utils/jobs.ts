@@ -1,96 +1,77 @@
-// pages/api/auth/utils/jobs.ts
+// src/utils/jobs.ts
+import { PrismaClient } from "@prisma/client";
 
-import { v4 as uuidv4 } from "uuid";
+const prisma = new PrismaClient();
 
-// Define the status of each step
-type StepStatus = "pending" | "in-progress" | "completed" | "failed";
+export type StepStatus = "pending" | "in-progress" | "completed" | "failed";
 
-// Define a step with a name and its current status
-interface JobStep {
+export interface JobStep {
   name: string;
   status: StepStatus;
   message?: string;
 }
 
-// Define the Job interface
-interface Job {
-  id: string;
-  type: string;
-  steps: JobStep[];
-  createdAt: number;
-  updatedAt: number;
-  returnValue?: any; // expect JSON
-  inngestRunId?: string;
+/**
+ * Creates a new job record in the database.
+ */
+export async function createJob(
+  type: string,
+  steps: JobStep[],
+  userId?: string
+): Promise<string> {
+  const job = await prisma.job.create({
+    data: {
+      type,
+      // Store as JSON string
+      steps: JSON.stringify(steps),
+      userId: userId || null,
+    },
+  });
+  return job.id;
 }
 
-// Extend the NodeJS Global interface to include our job manager
-declare global {
-  var jobs: Record<string, Job> | undefined;
-}
-
-global.jobs = global.jobs || {};
-
-// Export the jobs reference
-export const jobs: Record<string, Job> = global.jobs;
-
-// Utility function to create a new job
-export const createJob = (type: string, steps: JobStep[]): string => {
-  const jobId = uuidv4();
-  jobs[jobId] = {
-    id: jobId,
-    type,
-    steps,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-  return jobId;
-};
-
-// Utility function to update a job's step status
-export const updateJobStep = (
+/**
+ * Updates a given step of a job.
+ */
+export async function updateJobStep(
   jobId: string,
   stepName: string,
   status: StepStatus,
   message?: string
-) => {
-  const job = jobs[jobId];
+): Promise<void> {
+  const job = await prisma.job.findUnique({ where: { id: jobId } });
   if (!job) {
     console.error(`Job with ID ${jobId} not found.`);
     return;
   }
 
-  const step = job.steps.find((s) => s.name === stepName);
-  if (step) {
-    step.status = status;
-    if (message) {
-      step.message = message;
-    }
-    job.updatedAt = Date.now();
-  } else {
-    console.error(`Step '${stepName}' not found in job ${jobId}.`);
-  }
-};
+  // Parse the JSON string into an array
+  const steps: JobStep[] = JSON.parse(job.steps || "[]");
 
-// Add return value to a job
-export const addReturnValueToJob = (jobId: string, returnValue: any) => {
-  const job = jobs[jobId];
-  if (!job) {
-    console.error(`Job with ID ${jobId} not found.`);
-    return;
-  }
-  job.returnValue = returnValue;
-  job.updatedAt = Date.now();
-};
+  const updatedSteps = steps.map((step) =>
+    step.name === stepName
+      ? { ...step, status, message: message || step.message }
+      : step
+  );
 
-export const addInngestRunIdToJob = (
+  await prisma.job.update({
+    where: { id: jobId },
+    data: {
+      // Convert array back to a string
+      steps: JSON.stringify(updatedSteps),
+    },
+  });
+}
+
+/**
+ * Associates an Inngest run id with a job.
+ */
+export async function addInngestRunIdToJob(
   jobId: string,
   inngestRunId: string | undefined
-) => {
-  const job = jobs[jobId];
-  if (!job) {
-    console.error(`Job with ID ${jobId} not found.`);
-    return;
-  }
-  job.inngestRunId = inngestRunId;
-  job.updatedAt = Date.now();
-};
+): Promise<void> {
+  await prisma.job.update({
+    where: { id: jobId },
+    data: { inngestRunId },
+  });
+}

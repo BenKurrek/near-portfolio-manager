@@ -1,5 +1,4 @@
 // src/context/BalanceContext.tsx
-
 import React, {
   createContext,
   useState,
@@ -11,13 +10,12 @@ import React, {
 import { AuthContext } from "@context/AuthContext";
 import { flattenTokens } from "@utils/intents/flattenTokens";
 import { LIST_TOKENS } from "@src/constants/tokens";
-import { FlattenedToken } from "@src/types/tokens";
 import { fetchBatchBalances } from "@utils/helpers/nearIntents";
 import { configureNetwork } from "@utils/config";
 
 interface TokenBalance {
-  token: FlattenedToken;
-  balance: string; // Big string
+  token: any;
+  balance: string;
 }
 
 interface BalanceContextType {
@@ -33,17 +31,18 @@ export const BalanceContext = createContext<BalanceContextType>({
 export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const { accountMetadata, derivedDepositAddress } = useContext(AuthContext);
+  const { accountMetadata } = useContext(AuthContext);
+  // Read deposit address from the structured metadata
+  const depositAddress =
+    accountMetadata?.contractMetadata?.contracts.userDepositAddress || "";
   const [balances, setBalances] = useState<TokenBalance[]>([]);
-
   const config = configureNetwork(
     process.env.NEXT_PUBLIC_APP_NETWORK_ID as "testnet" | "mainnet"
   );
-
   const flattened = flattenTokens(LIST_TOKENS);
 
   const refreshBalances = useCallback(async () => {
-    if (!derivedDepositAddress) {
+    if (!depositAddress) {
       setBalances([]);
       return;
     }
@@ -51,10 +50,10 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
       const tokenIds = flattened.map((t) => t.defuseAssetId);
       const results = await fetchBatchBalances(
         config.nearNodeURL,
-        derivedDepositAddress,
+        depositAddress,
         tokenIds
       );
-      const newBalances: TokenBalance[] = flattened.map((token, idx) => ({
+      const newBalances = flattened.map((token, idx) => ({
         token,
         balance: results[idx] || "0",
       }));
@@ -63,16 +62,12 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
       console.error("Error fetching balances:", error);
       setBalances([]);
     }
-  }, [derivedDepositAddress, flattened, config.nearNodeURL]);
+  }, [depositAddress, flattened, config.nearNodeURL]);
 
   useEffect(() => {
     refreshBalances();
-    const interval = setInterval(() => {
-      refreshBalances();
-    }, 10000);
-    return () => {
-      clearInterval(interval);
-    };
+    const interval = setInterval(refreshBalances, 10000);
+    return () => clearInterval(interval);
   }, [refreshBalances]);
 
   return (

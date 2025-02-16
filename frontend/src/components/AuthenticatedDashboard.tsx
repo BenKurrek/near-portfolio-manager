@@ -1,25 +1,20 @@
 // src/components/AuthenticatedDashboard.tsx
-
 import React, { useContext, useState } from "react";
+import axios from "axios";
 import { AuthContext } from "@context/AuthContext";
-import { ContractMetadata } from "@utils/models/metadata";
 import { AppConfig } from "@utils/config";
 import {
-  FaPaperPlane,
-  FaExchangeAlt,
   FaUserAlt,
   FaDollarSign,
   FaGem,
   FaDog,
-  FaChartPie,
+  FaExchangeAlt,
 } from "react-icons/fa";
 import { FiCopy } from "react-icons/fi";
 import { BsEye } from "react-icons/bs";
 import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from "chart.js";
-import { apiService } from "@services/api";
 
-// Chart.js registration
 ChartJS.register(ArcElement, Tooltip, Legend, Title);
 
 interface Transaction {
@@ -30,8 +25,10 @@ interface Transaction {
 
 interface AuthenticatedDashboardProps {
   username: string | null;
-  accountMetadata: ContractMetadata;
-  userBalance: number; // USDC balance
+  accountMetadata: any;
+  portfolioData: any;
+  agentIds: string[];
+  userBalance: number;
   transactions: Transaction[];
   config: AppConfig;
   copied: boolean;
@@ -42,6 +39,8 @@ interface AuthenticatedDashboardProps {
 const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
   username,
   accountMetadata,
+  portfolioData,
+  agentIds,
   userBalance,
   transactions,
   config,
@@ -49,32 +48,31 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
   setCopied,
   handleDepositClick,
 }) => {
-  const [showAllTxs, setShowAllTxs] = useState<boolean>(false);
-
-  // Pull token from AuthContext so we can call private endpoints
+  const [showAllTxs, setShowAllTxs] = useState(false);
   const { token } = useContext(AuthContext);
 
-  // This is just an example “handleBuyBundle” we can add
-  const handleBuyBundle = async (bundleId: string, amount: number) => {
+  const handleBuyBundle = async (bundleType: string, amount: number) => {
     if (!token) {
-      alert("No token found. Please log in first.");
+      alert("You must be logged in to buy a bundle.");
       return;
     }
     try {
-      // Usually you'd update some local job UI or state
-      const response = await apiService.buyBundle(token, bundleId, amount);
-      console.log("buyBundle response => ", response);
-      // You might poll the job or show a "Job in progress" UI
-      alert(`Buy ${bundleId} initiated. jobId=${response.jobId}`);
-    } catch (err) {
-      console.error("Error buying bundle:", err);
-      alert("Failed to buy bundle. Check console for details.");
+      const response = await axios.post("/api/auth/user/buy-bundle", {
+        token,
+        bundleId: bundleType,
+        amount,
+      });
+      if (response.data.success) {
+        alert(`Buy bundle initiated. Job ID: ${response.data.jobId}`);
+      } else {
+        alert(`Failed to buy bundle: ${response.data.message}`);
+      }
+    } catch (error) {
+      console.error("Error buying bundle:", error);
+      alert("An error occurred while buying the bundle.");
     }
   };
 
-  /**
-   * Copy the user’s deposit address
-   */
   const handleCopyAddress = () => {
     if (!accountMetadata?.contracts?.userDepositAddress) return;
     navigator.clipboard.writeText(accountMetadata.contracts.userDepositAddress);
@@ -82,7 +80,6 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Sample chart data
   const balancerChartData = {
     labels: ["USDC", "ETH", "Others"],
     datasets: [
@@ -90,73 +87,58 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
         label: "Allocation",
         data: [50, 25, 25],
         backgroundColor: ["#8ECAE6", "#219EBC", "#FFB703"],
-        borderWidth: 0,
       },
     ],
   };
 
   return (
-    <div className="mt-8 space-y-12 text-gray-100 bg-brandDark min-h-screen px-4 py-8">
-      {/* TOP USER INFO */}
+    <div className="mt-8 space-y-12 bg-brandDark min-h-screen px-4 py-8 text-gray-100">
       <section className="bg-gradient-to-r from-brandDark to-brandMain p-6 rounded-lg shadow space-y-6">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-6">
-          {/* Avatar + Username */}
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-brandAccent rounded-full shadow-md text-white">
-              <FaUserAlt className="w-6 h-6" />
-            </div>
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-brandAccent rounded-full shadow-md text-white">
+            <FaUserAlt className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold">{username}</h2>
+            <p className="text-sm">
+              Portfolio IDs:{" "}
+              {portfolioData?.map((p: any) => p.id).join(", ") || "N/A"}
+            </p>
+            <p className="text-sm">
+              Agents: {agentIds.length ? agentIds.join(", ") : "None"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-8">
+          <div className="flex items-center gap-2">
+            <FaDollarSign className="text-green-400 w-6 h-6" />
             <div>
-              <h2 className="text-2xl font-extrabold">{username}</h2>
-              <p className="text-sm text-gray-300">
-                Logged into your USDC Vault
+              <p className="text-sm">USDC Balance</p>
+              <p className="text-xl font-bold">
+                {userBalance.toLocaleString()} USDC
               </p>
             </div>
           </div>
-
-          {/* Balance + Deposit Button */}
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2">
-              <FaDollarSign className="text-green-400 w-6 h-6" />
-              <div>
-                <p className="text-sm text-gray-300">USDC Balance</p>
-                <p className="text-xl font-bold">
-                  {userBalance.toLocaleString()} USDC
-                </p>
-              </div>
-            </div>
-            <button
-              className="btn btn-primary text-black hover:text-white"
-              onClick={handleDepositClick}
-            >
-              Deposit USDC
-            </button>
-          </div>
+          <button className="btn btn-primary" onClick={handleDepositClick}>
+            Deposit USDC
+          </button>
         </div>
-
-        {/* Deposit Address */}
-        <div className="bg-brandDark/30 p-4 rounded-md flex items-center justify-between">
+        <div className="bg-brandDark/30 p-4 rounded-md flex justify-between items-center">
           <div>
-            <p className="text-sm text-gray-300 mb-1">Your Deposit Address</p>
+            <p className="text-sm mb-1">Deposit Address</p>
             {accountMetadata?.contracts?.userDepositAddress ? (
               <p className="font-mono text-sm break-all">
                 {accountMetadata.contracts.userDepositAddress}
               </p>
             ) : (
-              <span className="text-sm text-red-400">
-                No deposit address found
-              </span>
+              <span className="text-sm text-red-400">No deposit address</span>
             )}
           </div>
           <button
             onClick={handleCopyAddress}
-            className="p-2 rounded-md bg-brandAccent text-black hover:bg-white hover:text-brandDark transition-base"
-            title="Copy Address"
+            className="p-2 bg-brandAccent rounded-md"
           >
-            {copied ? (
-              <span className="text-sm font-semibold">Copied!</span>
-            ) : (
-              <FiCopy className="w-5 h-5" />
-            )}
+            {copied ? <span>Copied!</span> : <FiCopy className="w-5 h-5" />}
           </button>
         </div>
       </section>
@@ -244,9 +226,7 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
                     font: { size: 16 },
                   },
                   legend: {
-                    labels: {
-                      color: "#eee",
-                    },
+                    labels: { color: "#eee" },
                   },
                 },
               }}
@@ -280,7 +260,6 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
             </button>
           )}
         </div>
-
         {transactions.length === 0 ? (
           <p className="text-gray-400 text-sm">No transactions found.</p>
         ) : (

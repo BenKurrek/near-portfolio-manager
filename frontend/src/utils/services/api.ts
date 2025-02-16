@@ -127,7 +127,7 @@ export const apiService = {
 
   // E.g. Add AI Agent
   async addAiAgent(token: string, agentData: any) {
-    const res = await client.post("/auth/user/add-ai-agent", {
+    const res = await client.post("/auth/user/assign-agent", {
       token,
       agentData,
     });

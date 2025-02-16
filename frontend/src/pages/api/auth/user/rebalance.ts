@@ -20,20 +20,26 @@ export default async function handler(
   if (!username) {
     return res.status(401).json({ success: false, message: "Unauthorized" });
   }
+
   const user = await getUserByUsername(username);
-  if (!user?.contractMetadata) {
+  // Check if the user has a portfolio by testing for the userContractId
+  if (!user?.userContractId) {
     return res.status(400).json({ success: false, message: "No portfolio" });
   }
 
-  // Create a job
-  const jobId = createJob("rebalance", [
-    { name: "Preparing Rebalance Tx", status: "pending" },
-    { name: "Executing Rebalance On-Chain", status: "pending" },
-  ]);
+  // Create a job and associate it with the user
+  const jobId = await createJob(
+    "rebalance",
+    [
+      { name: "Preparing Rebalance Tx", status: "pending" },
+      { name: "Executing Rebalance On-Chain", status: "pending" },
+    ],
+    user.id
+  );
 
   res.status(202).json({ success: true, jobId });
 
-  // Fire Inngest
+  // Fire Inngest event asynchronously
   (async () => {
     await inngest.send({
       name: "platform/rebalance",

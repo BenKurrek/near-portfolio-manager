@@ -1,15 +1,13 @@
 // src/inngest/events.ts
-
 import { EventSchemas } from "inngest";
-import { CreatePortfolioPayload } from "@utils/models/inngest";
 
-/**
- * An example of typed Inngest events.
- * Adjust if you have more events.
- */
 export type Events = {
   "platform/create-portfolio": {
-    data: CreatePortfolioPayload;
+    data: {
+      jobId: string;
+      username: string;
+      ownerPubkey: string;
+    };
   };
   "platform/buy-bundle": {
     data: {
@@ -28,7 +26,7 @@ export type Events = {
       toAddress: string;
     };
   };
-  "platform/add-ai-agent": {
+  "platform/assign-agent": {
     data: {
       jobId: string;
       username: string;

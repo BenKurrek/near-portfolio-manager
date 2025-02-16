@@ -1,0 +1,75 @@
+// prisma/schema.prisma
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                 String      @id @default(uuid())
+  username           String      @unique
+  sudoKey            String?
+  userDepositAddress String?
+  userContractId     String?
+  mpcContractId      String?
+  nearAccountId      String?
+  turnKey            String?
+  portfolios         Portfolio[]
+  authenticators     String?     @default("[]")
+
+  agents     Agent[]
+  sessions   Session[]
+  challenges Challenge[]
+  Job        Job[]
+}
+
+model Portfolio {
+  id         String  @id @default(uuid())
+  ownerId    String
+  owner      User    @relation(fields: [ownerId], references: [id])
+  contractId String
+  agents     Agent[]
+}
+
+model Agent {
+  id          String    @id @default(uuid())
+  publicKey   String
+  portfolioId String
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
+}
+
+model Job {
+  id    String @id @default(uuid())
+  type  String
+  steps String
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  inngestRunId String?
+  returnValue  String?
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+}
+
+model Session {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+}
+
+model Challenge {
+  id        String   @id @default(uuid())
+  challenge String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}

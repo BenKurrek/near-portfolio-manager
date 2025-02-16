@@ -1,205 +1,170 @@
-// api/auth/utils/user.ts
+// src/pages/api/auth/utils/user.ts
+import prisma from "@src/db";
+import type { Portfolio, User as PrismaUser, Agent } from "@prisma/client";
+import type { ContractMetadata } from "@utils/models/metadata";
 
-import { Base64URLString, WebAuthnCredential } from "@simplewebauthn/server";
-import { v4 as uuidv4 } from "uuid";
-import { ContractMetadata } from "../../../../utils/models/metadata";
-
-// Define the User interface
-export interface User {
+/**
+ * We'll define how each authenticator looks in code.
+ */
+interface StoredAuthenticator {
   id: string;
-  username: string;
-  authenticators: WebAuthnCredential[];
-  contractMetadata: ContractMetadata | null;
-  nearAccountId?: string | null;
-  turnKey?: string | null;
-  recoveryKey?: string | null;
+  publicKey: string;
+  counter: number;
+  transports: string[];
 }
 
-// Extend the NodeJS Global interface to include our mock databases
-declare global {
-  var users: User[];
-  var credentialIdToUserId: Record<Base64URLString, string>;
-}
-
-global.users = global.users || [];
-global.credentialIdToUserId = global.credentialIdToUserId || {};
-
-// Export the reference
-export const users = global.users;
-export const credentialIdToUserId = global.credentialIdToUserId;
-
 /**
- * Fetch a user by their username.
- * @param username - The username of the user.
- * @returns The User object if found, otherwise undefined.
+ * Instead of 'extends PrismaUser', omit the "authenticators" property
+ * from the PrismaUser and define it yourself.
  */
-export const getUserByUsername = async (
-  username: string
-): Promise<User | undefined> => {
-  const normalizedUsername = username.toLowerCase();
-  console.log(`Fetching user by username: '${normalizedUsername}'.`);
-  const user = users.find((user) => user.username === normalizedUsername);
-  if (user) {
-    console.log(`User '${normalizedUsername}' found.`);
-  } else {
-    console.warn(`User '${normalizedUsername}' not found.`);
-  }
-  return user;
-};
-
-// Fetch user by credential ID
-export const getUserByCredentialId = async (
-  credentialID: string
-): Promise<User | undefined> => {
-  console.log(`Fetching user by credentialID: '${credentialID}'.`);
-  const userId = credentialIdToUserId[credentialID];
-  if (!userId) {
-    console.warn(`No user found for credentialID '${credentialID}'.`);
-    return undefined;
-  }
-  const user = users.find((user) => user.id === userId);
-  if (user) {
-    console.log(
-      `User '${user.username}' found for credentialID '${credentialID}'.`
-    );
-  } else {
-    console.warn(
-      `User ID '${userId}' not found for credentialID '${credentialID}'.`
-    );
-  }
-  return user;
+export type ExtendedUser = Omit<PrismaUser, "authenticators"> & {
+  portfolios: Portfolio[];
+  agents: Agent[];
+  authenticators: StoredAuthenticator[];
 };
 
 /**
- * Add a new user to the system.
- * @param username - The username of the new user.
- * @returns The newly created User object.
+ * Helper to parse `authenticators` from DB (stored as a JSON string).
  */
-export const addUser = async (username: string): Promise<User> => {
-  const normalizedUsername = username.toLowerCase();
-  const newUser: User = {
-    id: uuidv4(),
-    username: normalizedUsername,
-    authenticators: [],
-    nearAccountId: null,
-    contractMetadata: null,
-    turnKey: null,
-    recoveryKey: null,
-  };
-
-  console.log(`Adding new user: '${normalizedUsername}'.`);
-  users.push(newUser);
-  console.log(`User '${normalizedUsername}' added with ID '${newUser.id}'.`);
-  return newUser;
-};
-
-/**
- * Add an authenticator to a user.
- * @param userId - The ID of the user.
- * @param authenticator - The WebAuthn authenticator credential.
- */
-export const addAuthenticatorToUser = async (
-  userId: string,
-  authenticator: WebAuthnCredential
-): Promise<void> => {
-  console.log(`Adding authenticator to user ID '${userId}'.`);
-
-  // Check if the credential is already associated with another user
-  if (
-    credentialIdToUserId[authenticator.id] &&
-    credentialIdToUserId[authenticator.id] !== userId
-  ) {
-    console.error(
-      "Authenticator credential ID already in use by another user."
-    );
-    throw new Error("Passkey already associated with another account.");
-  }
-
-  // Associate the credential with the user
-  credentialIdToUserId[authenticator.id] = userId;
-
-  // Add the authenticator to the user's record
-  const user = users.find((user) => user.id === userId);
-  if (user) {
-    // Prevent duplicate authenticators
-    const existingAuth = user.authenticators.find(
-      (authr) => authr.id === authenticator.id
-    );
-    if (!existingAuth) {
-      user.authenticators.push(authenticator);
-      console.log(
-        `Authenticator '${authenticator.id}' added to user '${user.username}'.`
-      );
-    } else {
-      console.log(
-        `User '${user.username}' already has authenticator '${authenticator.id}'.`
-      );
+function parseAuthenticators(authStr?: string | null): StoredAuthenticator[] {
+  if (!authStr) return [];
+  try {
+    const arr = JSON.parse(authStr);
+    if (Array.isArray(arr)) {
+      return arr;
     }
-  } else {
-    throw new Error("User not found.");
+    return [];
+  } catch {
+    return [];
   }
-};
+}
 
 /**
- * Update NEAR Account ID and related metadata for a user.
- * @param userId - The ID of the user.
- * @param contractMetadata - The contract metadata to set.
- * @param turnKey - The turn key.
- * @param recoveryKey - The recovery key.
+ * Fetch a user by username (case-insensitive).
  */
-export const setUserContractData = async (
+export async function getUserByUsername(
+  username: string
+): Promise<ExtendedUser | null> {
+  const normalizedUsername = username.toLowerCase();
+  const user = await prisma.user.findUnique({
+    where: { username: normalizedUsername },
+    include: { portfolios: true, agents: true },
+  });
+  if (!user) return null;
+
+  return {
+    ...user,
+    authenticators: parseAuthenticators(user.authenticators),
+  };
+}
+
+/**
+ * Fetch a user by credential ID.
+ */
+export async function getUserByCredentialId(
+  credentialID: string
+): Promise<ExtendedUser | null> {
+  const users = await prisma.user.findMany({
+    include: { portfolios: true, agents: true },
+  });
+  for (const user of users) {
+    const auths = parseAuthenticators(user.authenticators);
+    if (auths.some((auth) => auth.id === credentialID)) {
+      return { ...user, authenticators: auths };
+    }
+  }
+  return null;
+}
+
+/**
+ * Create a new user with empty "[]" for authenticators (JSON string).
+ */
+export async function addUser(username: string): Promise<ExtendedUser> {
+  const normalizedUsername = username.toLowerCase();
+  const user = await prisma.user.create({
+    data: {
+      username: normalizedUsername,
+      authenticators: "[]", // store as JSON string
+    },
+    include: { portfolios: true, agents: true },
+  });
+  return {
+    ...user,
+    authenticators: [],
+  };
+}
+
+/**
+ * Add an authenticator to an existing user by reading the old array,
+ * pushing the new authenticator, then storing as JSON.
+ */
+export async function addAuthenticatorToUser(
+  userId: string,
+  authenticator: StoredAuthenticator
+): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error("User not found.");
+
+  const currentStr = user.authenticators || "[]";
+  const currentAuths = parseAuthenticators(currentStr);
+  currentAuths.push(authenticator);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      authenticators: JSON.stringify(currentAuths),
+    },
+  });
+
+  console.log(
+    `Authenticator '${authenticator.id}' added for user '${user.username}'.`
+  );
+}
+
+/**
+ * Set contract data for the user (like deposit address, contract IDs, etc.).
+ */
+export async function setUserContractData(
   userId: string,
   contractMetadata: ContractMetadata,
   turnKey: string
-): Promise<void> => {
-  console.log(`Setting contract data for user ID '${userId}'.`);
-  const user = users.find((user) => user.id === userId);
-  if (user) {
-    user.nearAccountId = contractMetadata.contracts.userContractId;
-    user.contractMetadata = contractMetadata;
-    user.turnKey = turnKey;
-    console.log(
-      `Contract data set for user '${user.username}'. NEAR Account ID: '${user.nearAccountId}'.`
-    );
-  } else {
-    console.error(`SetUserContractData failed: User ID '${userId}' not found.`);
-    throw new Error("User not found.");
-  }
-};
+): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      sudoKey: contractMetadata.keys.sudo_key,
+      userDepositAddress: contractMetadata.contracts.userDepositAddress,
+      userContractId: contractMetadata.contracts.userContractId,
+      mpcContractId: contractMetadata.contracts.mpcContractId,
+      nearAccountId: contractMetadata.contracts.userContractId,
+      turnKey,
+    },
+  });
+  console.log(`Contract data set for user ID '${userId}'.`);
+}
 
 /**
- * Update the authenticator counter to prevent replay attacks.
- * @param userId - The ID of the user.
- * @param credentialID - The credential ID of the authenticator.
- * @param newCounter - The new counter value.
+ * Update the counter for an authenticator in the stored array.
  */
-export const updateAuthenticatorCounter = async (
+export async function updateAuthenticatorCounter(
   userId: string,
   credentialID: string,
   newCounter: number
-): Promise<void> => {
-  console.log(
-    `Updating authenticator counter for user ID '${userId}', credentialID '${credentialID}'.`
+): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error("User not found.");
+
+  const currentAuths = parseAuthenticators(user.authenticators);
+  const updated = currentAuths.map((auth) =>
+    auth.id === credentialID ? { ...auth, counter: newCounter } : auth
   );
-  const user = users.find((user) => user.id === userId);
-  if (user) {
-    const authenticator = user.authenticators.find(
-      (authr) => authr.id === credentialID
-    );
-    if (authenticator) {
-      authenticator.counter = newCounter;
-      console.log(
-        `Authenticator counter updated to '${newCounter}' for user '${user.username}'.`
-      );
-    } else {
-      console.warn(
-        `Authenticator ID '${credentialID}' not found for user '${user.username}'.`
-      );
-    }
-  } else {
-    console.error(
-      `UpdateAuthenticatorCounter failed: User ID '${userId}' not found.`
-    );
-    throw new Error("User not found.");
-  }
-};
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      authenticators: JSON.stringify(updated),
+    },
+  });
+
+  console.log(`Authenticator counter updated for user '${user.username}'.`);
+}

@@ -1,16 +1,17 @@
+// src/components/Login.tsx
 import React, { useState } from "react";
 import {
   startAuthentication,
   AuthenticationResponseJSON,
 } from "@simplewebauthn/browser";
 import axios from "axios";
-import { ContractMetadata } from "@utils/models/metadata";
+import type { AuthMetadata } from "@context/AuthContext";
 
 interface LoginProps {
   onLoggedIn: (
     username: string,
     token: string,
-    accountMetadata: ContractMetadata
+    userMetadata: AuthMetadata
   ) => void;
 }
 

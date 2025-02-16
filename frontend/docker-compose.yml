@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000" # Next.js frontend
+      - "3001:3001" # Inngest dev server
+    environment:
+      # For Prisma SQLite we use a file-based URL; change for production (e.g. Postgres) as needed.
+      DATABASE_URL: "file:./prisma/dev.db"
+      NEXT_PUBLIC_APP_NETWORK_ID: "testnet"
+      NODE_ENV: "development"
+    volumes:
+      - .:/app
+      - /app/node_modules

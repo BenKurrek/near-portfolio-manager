@@ -1,5 +1,4 @@
 // src/modals/DepositModal.tsx
-
 import React, { useContext, useState } from "react";
 import { QRCodeSVG as QRCode } from "qrcode.react";
 import { AuthContext } from "../context/AuthContext";
@@ -21,22 +20,20 @@ interface DepositModalProps {
   onClose: () => void;
 }
 
-/**
- * Example deposit modal using the "derivedDepositAddress" from AuthContext
- */
 const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) => {
-  const { derivedDepositAddress } = useContext(AuthContext);
+  // Use accountMetadata from AuthContext (structured metadata)
+  const { accountMetadata } = useContext(AuthContext);
+  const depositAddress =
+    accountMetadata?.contractMetadata?.contracts.userDepositAddress || "";
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
-  if (!isOpen) {
-    return null;
-  }
+  if (!isOpen) return null;
 
   const handleCopy = async () => {
-    if (!derivedDepositAddress) return;
+    if (!depositAddress) return;
     try {
-      await navigator.clipboard.writeText(derivedDepositAddress);
-      setCopySuccess(`Address copied!`);
+      await navigator.clipboard.writeText(depositAddress);
+      setCopySuccess("Address copied!");
       setTimeout(() => setCopySuccess(null), 2000);
     } catch (err) {
       console.error("Failed to copy:", err);
@@ -51,14 +48,13 @@ const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) => {
         <h2 className="text-2xl font-semibold mb-6 text-center">
           Deposit Address
         </h2>
-
-        {derivedDepositAddress ? (
+        {depositAddress ? (
           <>
             <div className="text-center">
               <div className="mb-6 flex justify-center">
                 <div className="bg-white rounded-lg p-2 shadow">
                   <QRCode
-                    value={derivedDepositAddress}
+                    value={depositAddress}
                     size={200}
                     level="H"
                     bgColor="transparent"
@@ -66,10 +62,9 @@ const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) => {
                   />
                 </div>
               </div>
-
               <div className="bg-gray-700 p-4 rounded-lg mb-4 break-all text-sm">
                 <div className="flex items-center justify-between">
-                  <div className="font-mono">{derivedDepositAddress}</div>
+                  <div className="font-mono">{depositAddress}</div>
                   <button
                     onClick={handleCopy}
                     className="ml-2 p-2 text-gray-300 hover:text-blue-400 transition"
@@ -91,8 +86,6 @@ const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) => {
             No deposit address found. Are you logged in?
           </p>
         )}
-
-        {/* Close Button */}
         <div className="mt-6 flex justify-end">
           <button
             onClick={onClose}

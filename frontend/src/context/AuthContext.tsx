@@ -7,35 +7,42 @@ import React, {
   ReactNode,
   useCallback,
 } from "react";
-import { ContractMetadata } from "@utils/models/metadata";
 import { apiService } from "@services/api";
 
-/** Utility to generate a deposit address from the user’s sudo key */
-function generateNearDepositAddress(sudoKey: string) {
-  const someHash = sudoKey.slice(8, 16);
-  return `dep-${someHash}.intents.near`;
+/**
+ * The shape of the user’s metadata from whoami, combining
+ * contract data + portfolio data + agent IDs.
+ */
+export interface AuthMetadata {
+  contractMetadata: {
+    keys: { sudo_key: string };
+    contracts: {
+      userDepositAddress: string;
+      userContractId: string;
+      mpcContractId: string;
+    };
+  };
+  portfolioData: any;
+  agentIds: string[];
 }
 
 interface AuthContextType {
   username: string | null;
   token: string | null;
-  accountMetadata: ContractMetadata | null;
-  login: (
-    uname: string,
-    tok: string,
-    metadata: ContractMetadata | null
-  ) => void;
+  accountMetadata: AuthMetadata | null; // This holds contract data, portfolio, agent IDs
+  login: (uname: string, tok: string, userMetadata: AuthMetadata) => void;
   logout: () => void;
-  derivedDepositAddress: string | null;
 }
 
+/**
+ * Default context
+ */
 export const AuthContext = createContext<AuthContextType>({
   username: null,
   token: null,
   accountMetadata: null,
   login: () => {},
   logout: () => {},
-  derivedDepositAddress: null,
 });
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
@@ -43,64 +50,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const [username, setUsername] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [accountMetadata, setAccountMetadata] =
-    useState<ContractMetadata | null>(null);
-  const [derivedDepositAddress, setDerivedDepositAddress] = useState<
-    string | null
-  >(null);
+  const [accountMetadata, setAccountMetadata] = useState<AuthMetadata | null>(
+    null
+  );
 
-  // On mount, check localStorage for token, then call whoami
+  /**
+   * On first load, check localStorage for a token and validate with whoami.
+   */
   useEffect(() => {
     const storedToken = localStorage.getItem("token");
     if (storedToken) {
       apiService
         .whoami(storedToken)
         .then((res) => {
-          const { username, userMetadata } = res;
-          setUsername(username);
+          setUsername(res.username);
           setToken(storedToken);
-          setAccountMetadata(userMetadata);
-
-          // Derive deposit if user has a sudo_key
-          if (userMetadata?.keys?.sudo_key) {
-            setDerivedDepositAddress(
-              generateNearDepositAddress(userMetadata.keys.sudo_key)
-            );
-          }
+          // The whoami endpoint returns `userMetadata` which includes
+          // contractMetadata, portfolioData, agentIds
+          setAccountMetadata(res.userMetadata);
         })
-        .catch(() => {
-          localStorage.removeItem("token");
-        });
+        .catch(() => localStorage.removeItem("token"));
     }
   }, []);
 
+  /**
+   * The login function now receives all user metadata in a single object.
+   */
   const login = useCallback(
-    (uname: string, tok: string, metadata: ContractMetadata | null) => {
+    (uname: string, tok: string, userMetadata: AuthMetadata) => {
       setUsername(uname);
       setToken(tok);
-      setAccountMetadata(metadata);
+      setAccountMetadata(userMetadata);
       localStorage.setItem("token", tok);
-
-      if (metadata?.keys?.sudo_key) {
-        setDerivedDepositAddress(
-          generateNearDepositAddress(metadata.keys.sudo_key)
-        );
-      }
     },
     []
   );
 
+  /**
+   * Logs the user out and clears local storage.
+   */
   const logout = useCallback(() => {
-    // We'll also call apiService.logout if needed
     if (token) {
-      apiService.logout(token).catch(() => {
-        // even if it fails, still clear locally
-      });
+      apiService.logout(token).catch(() => {});
     }
     setUsername(null);
     setToken(null);
     setAccountMetadata(null);
-    setDerivedDepositAddress(null);
     localStorage.removeItem("token");
   }, [token]);
 
@@ -112,7 +107,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         accountMetadata,
         login,
         logout,
-        derivedDepositAddress,
       }}
     >
       {children}

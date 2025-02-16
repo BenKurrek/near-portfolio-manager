@@ -1,8 +1,6 @@
-// src/pages/api/auth/user/withdraw.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@src/db";
 import { loggedInUsers } from "../sessions";
-import { getUserByUsername } from "../utils/user";
 import { createJob } from "../utils/jobs";
 import { inngest } from "@inngest/index";
 import { initNearConnection } from "@utils/services/contractService";
@@ -12,29 +10,17 @@ export default async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== "POST") return res.status(405).end();
-  const { token, asset, amount, toAddress, withdrawalData, signature } =
-    req.body;
-  if (
-    !token ||
-    !asset ||
-    !amount ||
-    !toAddress ||
-    !withdrawalData ||
-    !signature
-  ) {
+  const { token, portfolioAssignPayload, signature, agentPubkey } = req.body;
+  if (!token || !portfolioAssignPayload || !signature || !agentPubkey) {
     return res.status(400).json({ success: false, message: "Missing params" });
   }
   const username = loggedInUsers[token];
   if (!username)
     return res.status(401).json({ success: false, message: "Unauthorized" });
-  const user = await getUserByUsername(username);
-  if (!user)
-    return res.status(400).json({ success: false, message: "User not found" });
-  const jobId = await createJob(
-    "withdraw",
-    [{ name: "Initiate On-Chain Withdraw", status: "pending" }],
-    user.id
-  );
+
+  const jobId = await createJob("assign-agent", [
+    { name: "Assign Agent", status: "pending" },
+  ]);
   res.status(202).json({ success: true, jobId });
 
   const networkId = process.env.NEXT_PUBLIC_APP_NETWORK_ID as
@@ -48,16 +34,42 @@ export default async function handler(
     process.env.NEXT_PUBLIC_NEAR_PLATFORM_SIGNER_ID!
   );
   const contractId = process.env.NEXT_PUBLIC_CONTRACT_ID!;
+
   await signerAccount.functionCall({
     contractId,
-    methodName: "withdraw_funds",
-    args: { withdrawal_data: withdrawalData, signature: signature },
+    methodName: "assign_portfolio_agent",
+    args: {
+      portolio_data: portfolioAssignPayload,
+      signature,
+      agent_pubkey: agentPubkey,
+    },
     gas: BigInt("300000000000000"),
     attachedDeposit: BigInt("0"),
   });
+
+  // Update DB: add new agent record and update user's agent list.
+  const userRecord = await prisma.user.findUnique({
+    where: { username },
+    include: { portfolios: true },
+  });
+  if (userRecord && userRecord.portfolios.length > 0) {
+    // For simplicity, assign agent to the first portfolio.
+    const portfolio = userRecord.portfolios[0];
+    const newAgent = await prisma.agent.create({
+      data: {
+        publicKey: agentPubkey,
+        portfolioId: portfolio.id,
+      },
+    });
+  }
+
   await inngest.send({
-    name: "platform/withdraw",
+    name: "platform/assign-agent",
     id: jobId,
-    data: { jobId, username, asset, amount, toAddress },
+    data: {
+      jobId,
+      username,
+      agentData: { portfolioAssignPayload, agentPubkey },
+    },
   });
 }

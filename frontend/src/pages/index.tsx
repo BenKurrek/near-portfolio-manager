@@ -1,15 +1,16 @@
 // src/pages/index.tsx
 
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext } from "react";
 import axios from "axios";
 import { AuthContext } from "@context/AuthContext";
 import { BalanceContext } from "@context/BalanceContext";
 import UnauthenticatedHero from "@components/UnauthenticatedHero";
 import LoadingOverlay from "@components/LoadingOverlay/LoadingOverlay";
-import LoginModal from "@components/../modals/LoginModal";
-import DepositModal from "@components/../modals/DepositModal";
+import LoginModal from "@modals/LoginModal";
+import DepositModal from "@modals/DepositModal";
 import AuthenticatedDashboard from "@components/AuthenticatedDashboard";
 import { configureNetwork } from "@utils/config";
+import type { AuthMetadata } from "@context/AuthContext";
 
 export default function Home() {
   const { username, token, accountMetadata, login, logout } =
@@ -17,12 +18,10 @@ export default function Home() {
 
   // Get balances from BalanceContext
   const { balances } = useContext(BalanceContext);
-
-  // Let's pretend we want the user’s USDC balance:
   const usdcItem = balances.find((b) => b.token.symbol === "USDC");
   const userBalance = parseFloat(usdcItem?.balance || "0");
 
-  /** -------------- States for Jobs/Modals etc. -------------- */
+  /** -------------- States for job polling + modals -------------- */
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [jobSteps, setJobSteps] = useState<
     {
@@ -60,14 +59,20 @@ export default function Home() {
         const res = await axios.get(`/api/auth/jobs/${jobId}`);
         const job = res.data;
 
-        setJobSteps(job.steps);
+        // job.steps is a JSON string in the DB, so you might parse it or
+        // ensure your job fetch route returns the parsed array. If that route
+        // returns the raw string, parse it here. But it looks like it might
+        // return them as a string. Adjust as needed if your route changed.
+        const steps =
+          typeof job.steps === "string" ? JSON.parse(job.steps) : job.steps;
 
-        const isCompleted = job.steps.every(
+        setJobSteps(steps);
+
+        const isCompleted = steps.every(
           (step: any) => step.status === "completed" || step.status === "failed"
         );
         if (isCompleted) {
           clearInterval(interval);
-          // ...
           setCurrentJobId(null);
           setTxHash(null);
         }
@@ -78,44 +83,42 @@ export default function Home() {
     }, 1000);
   };
 
-  // Registration callback
+  // Callback for when a user finishes registration
   const handleRegistered = async (token: string) => {
+    // Example: automatically create a portfolio job after user registration
     setJobSteps([]);
     setTxHash(null);
     setCurrentJobId(null);
 
     try {
+      // If you want to do some “deploy portfolio” logic:
       const deployResponse = await axios.post(
         "/api/auth/user/create-portfolio",
         {
           token,
+          ownerPubkey: "SOME_PUBKEY", // or get from the user
         }
       );
 
       if (deployResponse.data.success && deployResponse.data.jobId) {
         const jobId = deployResponse.data.jobId;
         setCurrentJobId(jobId);
-        setJobSteps([
-          { name: "Fetching Deposit Address", status: "pending" },
-          { name: "Creating Portfolio", status: "pending" },
-          { name: "Assigning Agent", status: "pending" },
-        ]);
+        setJobSteps([{ name: "Creating Portfolio", status: "pending" }]);
         setShowLoginModal(false);
-
         pollJobStatus(jobId);
-
-        // After job completes, fetch user
-        // ...
-      } else {
-        console.error("Failed to initiate contract creation job.");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Deployment error:", error);
     }
   };
 
-  // Login callback
-  const handleLoggedIn = (uname: string, tok: string, userMetadata: any) => {
+  // Callback for when a user logs in
+  const handleLoggedIn = (
+    uname: string,
+    tok: string,
+    userMetadata: AuthMetadata
+  ) => {
+    // Now we only pass three arguments to login, as we updated the signature
     login(uname, tok, userMetadata);
     setShowLoginModal(false);
   };
@@ -163,7 +166,14 @@ export default function Home() {
         ) : (
           <AuthenticatedDashboard
             username={username}
-            accountMetadata={accountMetadata}
+            accountMetadata={accountMetadata.contractMetadata}
+            /**
+             * We pass the arrays from accountMetadata
+             * If your whoami is returning userMetadata: { contractMetadata, portfolioData, agentIds }
+             * then you can do:
+             */
+            portfolioData={accountMetadata.portfolioData}
+            agentIds={accountMetadata.agentIds}
             userBalance={userBalance}
             transactions={[]} // Example empty transaction array
             config={config}

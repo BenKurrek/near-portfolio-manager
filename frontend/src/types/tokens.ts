@@ -8,7 +8,9 @@ export type SupportedChainName =
   | "bitcoin"
   | "solana"
   | "dogecoin"
-  | "turbochain";
+  | "turbochain"
+  | "aurora"
+  | "xrpledger"; // Added xrpledger as a supported chain name
 
 export interface FlattenedToken {
   defuseAssetId: string;
