@@ -2,36 +2,21 @@ use crate::*;
 
 #[near]
 impl IntentsProxyMpcContract {
-    // ---------------------------------------------------
-    // CREATE_PORTFOLIO
-    // Takes a single public key. Returns a new portfolio ID.
-    // ---------------------------------------------------
     #[payable]
-    pub fn create_portfolio(&mut self, owner_pubkey: PublicKey) -> PortfolioId {
-        // 1) If user does not exist in owner_map, create them
-        let mut user = self
-            .owner_map
-            .get(&owner_pubkey)
-            .cloned()
-            .unwrap_or_else(|| UserInfo {
-                nonce: 0,
-                portfolios: Vec::new(),
-            });
-
-        // 2) Generate a new portfolio ID
-        let new_port_id = self.global_portfolio_counter + 1;
-        self.global_portfolio_counter += 1;
-
-        // 3) Insert a new portfolio record
-        let portfolio_info = PortfolioInfo {
-            owner_key: owner_pubkey.clone(),
+    pub fn create_portfolio(
+        &mut self,
+        portolio_data: PortfolioSpread,
+        agent_id: AccountId,
+        intents_key: PublicKey,
+    ) {
+        let owner_id = env::predecessor_account_id();
+        let user = UserInfo {
+            required_spread: portolio_data,
+            near_intents_key: intents_key,
         };
-        self.portfolio_info.insert(new_port_id, portfolio_info);
+        self.user_info.insert(owner_id.clone(), user);
 
-        // 4) Update user to track this portfolio
-        user.portfolios.push(new_port_id);
-        self.owner_map.insert(owner_pubkey, user.clone());
-
-        new_port_id
+        let agent_info = self.agent_info.get_mut(&agent_id).expect("Agent not found");
+        agent_info.portfolios.insert(owner_id);
     }
 }

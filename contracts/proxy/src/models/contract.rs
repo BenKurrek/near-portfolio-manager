@@ -2,15 +2,19 @@
 //!
 //! Constants and storage keys used by the contract.
 
+use std::collections::HashMap;
+
 use near_sdk::BorshStorageKey;
 
 use crate::*;
 
+pub type PortfolioSpread = HashMap<String, f64>;
+
 #[near]
 #[derive(BorshStorageKey)]
 pub enum StorageKey {
-    OwnerMap,
-    AgentKeys,
+    UserInfo,
+    AgentInfo,
     PortfolioInfo,
 }
 

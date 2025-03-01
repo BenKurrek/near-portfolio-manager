@@ -6,11 +6,17 @@ use crate::*;
 
 #[near]
 impl IntentsProxyMpcContract {
-    pub fn get_portfolio(&self, portfolio_id: PortfolioId) -> Option<PortfolioInfo> {
-        self.portfolio_info.get(&portfolio_id).cloned()
+    pub fn get_agent_info(&self, agent_id: AccountId) -> Vec<AccountId> {
+        self.agent_info
+            .get(&agent_id)
+            .expect("No agent found")
+            .portfolios
+            .iter()
+            .cloned()
+            .collect()
     }
 
-    pub fn get_user(&self, user_pk: near_sdk::PublicKey) -> Option<UserInfo> {
-        self.owner_map.get(&user_pk).cloned()
+    pub fn get_user_info(&self, user_id: AccountId) -> Option<UserInfo> {
+        self.user_info.get(&user_id).cloned()
     }
 }

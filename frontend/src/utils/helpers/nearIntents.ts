@@ -109,7 +109,7 @@ export const fetchQuote = async ({
   defuse_asset_identifier_in,
   defuse_asset_identifier_out,
   exact_amount_in,
-  min_deadline_ms = 120000,
+  min_deadline_ms = 60000,
 }: {
   defuse_asset_identifier_in: string;
   defuse_asset_identifier_out: string;
@@ -126,7 +126,8 @@ export const fetchQuote = async ({
     method: "quote",
     params: [
       {
-        defuse_asset_identifier_in: defuse_asset_identifier_in.toLowerCase(),
+        defuse_asset_identifier_in:
+          "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
         defuse_asset_identifier_out: defuse_asset_identifier_out.toLowerCase(),
         exact_amount_in,
         min_deadline_ms,

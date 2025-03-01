@@ -2,7 +2,7 @@
 //!
 //! This file defines the main entry point (the contract struct) for the Vault contract.
 
-use near_sdk::store::LookupMap;
+use near_sdk::store::{LookupMap, LookupSet};
 use near_sdk::{
     env, json_types::Base64VecU8, log, near, require, AccountId, Gas, NearToken, PanicOnDefault,
     Promise, PromiseResult, PublicKey,
@@ -26,17 +26,8 @@ use utils::*;
 #[near(contract_state, serializers = [borsh])]
 #[derive(PanicOnDefault)]
 pub struct IntentsProxyMpcContract {
-    /// Each user is identified by their "owner public key" => OnChainUser
-    pub owner_map: LookupMap<PublicKey, UserInfo>,
-
-    /// Agent keys are smaller co-owners/AI agents, each with a KeyInfo struct referencing the portfolio
-    pub agent_keys: LookupMap<PublicKey, KeyInfo>,
-
-    /// The actual portfolio storage
-    pub portfolio_info: LookupMap<PortfolioId, PortfolioInfo>,
-
-    /// Global incrementing ID for new portfolios
-    pub global_portfolio_counter: u32,
+    pub user_info: LookupMap<AccountId, UserInfo>,
+    pub agent_info: LookupMap<AccountId, AgentInfo>,
 
     /// The MPC contract that each vault uses to sign transactions
     pub mpc_contract_id: AccountId,
@@ -48,10 +39,8 @@ impl IntentsProxyMpcContract {
     #[init]
     pub fn new(mpc_contract_id: AccountId) -> Self {
         Self {
-            owner_map: LookupMap::new(StorageKey::OwnerMap),
-            agent_keys: LookupMap::new(StorageKey::AgentKeys),
-            portfolio_info: LookupMap::new(StorageKey::PortfolioInfo),
-            global_portfolio_counter: 0,
+            user_info: LookupMap::new(StorageKey::UserInfo),
+            agent_info: LookupMap::new(StorageKey::AgentInfo),
             mpc_contract_id,
         }
     }
