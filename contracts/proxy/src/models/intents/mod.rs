@@ -8,7 +8,7 @@ use near_sdk::near;
 use token_diff::TokenDiff;
 use tokens::{FtWithdraw, MtWithdraw, NativeWithdraw, NftWithdraw};
 
-#[near(serializers = [borsh, json])]
+#[near(serializers = [json])]
 #[derive(Debug, Clone)]
 pub struct DefuseIntents {
     pub signer_id: String,
@@ -18,7 +18,7 @@ pub struct DefuseIntents {
     pub intents: Vec<Intent>,
 }
 
-#[near(serializers = [borsh, json])]
+#[near(serializers = [json])]
 #[serde(tag = "intent", rename_all = "snake_case")]
 #[derive(Debug, Clone, From)]
 pub enum Intent {

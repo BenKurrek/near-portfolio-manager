@@ -22,8 +22,12 @@ export default function Home() {
 
   // BalanceContext for user token balances
   const { balances } = useContext(BalanceContext);
-  const usdcItem = balances.find((b) => b.token.symbol === "USDC");
-  const userBalance = parseFloat(usdcItem?.balance || "0");
+  const usdcItems = balances.filter((b) => b.token.symbol === "USDC");
+  const totalBalance = usdcItems.reduce(
+    (sum, item) => sum + Number(item.balance),
+    0
+  );
+  const userBalance = parseFloat(totalBalance.toString());
 
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showDepositModal, setShowDepositModal] = useState<boolean>(false);

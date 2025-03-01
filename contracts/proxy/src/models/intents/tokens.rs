@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TokenAmounts<T = BTreeMap<TokenId, u128>>(T);
 
-#[near(serializers = [borsh, json])]
+#[near(serializers = [json])]
 #[derive(Debug, Clone)]
 pub struct FtWithdraw {
     pub token: AccountId,
@@ -24,7 +24,7 @@ pub struct FtWithdraw {
     pub storage_deposit: Option<NearToken>,
 }
 
-#[near(serializers = [borsh, json])]
+#[near(serializers = [json])]
 #[derive(Debug, Clone)]
 pub struct NftWithdraw {
     pub token: AccountId,
@@ -38,7 +38,7 @@ pub struct NftWithdraw {
     pub storage_deposit: Option<NearToken>,
 }
 
-#[near(serializers = [borsh, json])]
+#[near(serializers = [json])]
 #[derive(Debug, Clone)]
 pub struct MtWithdraw {
     pub token: AccountId,
@@ -54,7 +54,7 @@ pub struct MtWithdraw {
 }
 
 /// Withdraw native NEAR
-#[near(serializers = [borsh, json])]
+#[near(serializers = [json])]
 #[derive(Debug, Clone)]
 pub struct NativeWithdraw {
     pub receiver_id: AccountId,

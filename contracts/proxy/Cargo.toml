@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 near-sdk = "5.5.0"
 serde_json = "1.0.91"
+indexmap = { version = "1", features = ["serde-1"] }
 bs58 = "0.4"
 omni-transaction = { git = "https://github.com/near/omni-transaction-rs.git", branch = "master" }
 hex = "0.4.3"

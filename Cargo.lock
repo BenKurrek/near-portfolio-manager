@@ -821,6 +821,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "impl-tools",
+ "indexmap 1.9.3",
  "itertools",
  "near-account-id",
  "near-contract-standards",
