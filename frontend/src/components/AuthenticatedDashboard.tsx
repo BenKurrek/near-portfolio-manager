@@ -1,7 +1,11 @@
 // src/components/AuthenticatedDashboard.tsx
 import React, { useContext, useState } from "react";
 import DashboardHeader from "./Dashboard/DashboardHeader";
-import BuyBundlesSection, { BundleInfo } from "./Dashboard/BuyBundlesSection";
+import BuyBundlesSection, {
+  BundleInfo,
+  tokenDecimals,
+  tokenInformation,
+} from "./Dashboard/BuyBundlesSection";
 import BuyBundleModal from "./Dashboard/BuyBundleModal";
 import PortfolioBalancer from "./Dashboard/PortfolioBalancer";
 import TransactionHistory from "./Dashboard/TransactionHistory";
@@ -15,8 +19,6 @@ interface Transaction {
 interface AuthenticatedDashboardProps {
   username: string | null;
   accountMetadata: any;
-  portfolioData: any;
-  agentIds: string[];
   userBalance: number;
   transactions: Transaction[];
   handleDepositClick: () => void;
@@ -27,8 +29,6 @@ interface AuthenticatedDashboardProps {
 const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
   username,
   accountMetadata,
-  portfolioData,
-  agentIds,
   userBalance,
   transactions,
   handleDepositClick,
@@ -47,9 +47,9 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
       defaultAmount: 100,
       icon: <i className="fas fa-gem text-brandAccent text-xl" />,
       distribution: [
-        { symbol: "ETH", percentage: 30 },
-        { symbol: "SOL", percentage: 40 },
-        { symbol: "BTC", percentage: 30 },
+        { ...tokenInformation.ETH, percentage: 30 },
+        { ...tokenInformation.SOL, percentage: 40 },
+        { ...tokenInformation.BTC, percentage: 30 },
       ],
     },
     {
@@ -60,10 +60,10 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
       defaultAmount: 42,
       icon: <i className="fas fa-dog text-brandAccent text-xl" />,
       distribution: [
-        { symbol: "DOGE", percentage: 20 },
-        { symbol: "PEPE", percentage: 20 },
-        { symbol: "WIF", percentage: 30 },
-        { symbol: "Black Dragon", percentage: 30 },
+        { ...tokenInformation.DOGE, percentage: 20 },
+        { ...tokenInformation.PEPE, percentage: 20 },
+        { ...tokenInformation.WIF, percentage: 30 },
+        { ...tokenInformation["Black Dragon"], percentage: 30 },
       ],
     },
     {
@@ -74,10 +74,10 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
       defaultAmount: 50,
       icon: <i className="fas fa-exchange-alt text-brandAccent text-xl" />,
       distribution: [
-        { symbol: "AAVE", percentage: 30 },
-        { symbol: "UNI", percentage: 20 },
-        { symbol: "XRP", percentage: 30 },
-        { symbol: "NEAR", percentage: 20 },
+        { ...tokenInformation.AAVE, percentage: 30 },
+        { ...tokenInformation.UNI, percentage: 20 },
+        { ...tokenInformation.XRP, percentage: 30 },
+        { ...tokenInformation.NEAR, percentage: 20 },
       ],
     },
   ];
@@ -102,8 +102,6 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
     <div className="mt-8 space-y-12 bg-brandDark min-h-screen px-4 py-8 text-gray-100">
       <DashboardHeader
         username={username || ""}
-        portfolioIds={portfolioData?.map((p: any) => p.id) || []}
-        agentIds={agentIds}
         userBalance={userBalance}
         depositAddress={accountMetadata?.contracts?.userDepositAddress}
         copied={copied}

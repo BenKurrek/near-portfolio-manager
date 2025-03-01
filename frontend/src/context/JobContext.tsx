@@ -33,7 +33,7 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
 
   /**
    * Poll the given job ID until completion, updating jobSteps state.
-   * If successful and the job is e.g. create-portfolio, let's refresh user.
+   * If successful and the job is e.g. create-account, let's refresh user.
    */
   const pollJobStatus = useCallback(
     (jobId: string, jobType: string): Promise<void> => {
@@ -42,7 +42,7 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
           `pollJobStatus() started for jobId=${jobId}, type=${jobType}`
         );
         setCurrentJobId(jobId);
-        // Removed the initial step to prevent flashing "Starting create-portfolio"
+        // Removed the initial step to prevent flashing "Starting create-account"
         // setJobSteps([{ name: `Starting ${jobType}`, status: "pending" }]);
 
         const interval = setInterval(async () => {
@@ -65,9 +65,9 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
               const failedStep = steps.find(
                 (step: any) => step.status === "failed"
               );
-              if (!failedStep && jobType === "create-portfolio") {
+              if (!failedStep && jobType === "create-account") {
                 logger.info(
-                  "Portfolio created successfully. Refreshing user data..."
+                  "Account created successfully. Refreshing user data..."
                 );
                 await refreshUser();
                 resolve(); // Resolve when the job completes successfully
@@ -99,11 +99,11 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
           logger.warn("startJob() was called without a token!");
           return;
         }
-        if (jobType === "create-portfolio") {
-          const response = await apiService.createPortfolio(token);
+        if (jobType === "create-account") {
+          const response = await apiService.createAccount(token);
           if (response.success && response.jobId) {
-            logger.info("create-portfolio job started. Polling...");
-            await pollJobStatus(response.jobId, "create-portfolio");
+            logger.info("create-account job started. Polling...");
+            await pollJobStatus(response.jobId, "create-account");
           }
         }
         // Handle other job types as needed...

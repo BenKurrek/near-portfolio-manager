@@ -9,7 +9,8 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "build": "./build.sh",
-    "deploy:proxy": "ts-node scripts/deployContract.ts"
+    "deploy:proxy": "ts-node scripts/deployContract.ts",
+    "deploy:register-agent": "ts-node scripts/registerAgent.ts"
   },
   "dependencies": {
     "@keypom/core": "^1.0.6",

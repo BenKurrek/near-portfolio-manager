@@ -26,8 +26,6 @@ interface LoginResponse {
         userDepositAddress: string;
       };
     };
-    portfolioData: any;
-    agentIds: string[];
   } | null;
   error?: string;
 }
@@ -115,8 +113,6 @@ export default async function loginVerifyHandler(
             userDepositAddress: user.userDepositAddress || "",
           },
         },
-        portfolioData: user.portfolios,
-        agentIds: user.agents.map((agent) => agent.publicKey),
       };
 
       return res.status(200).json({

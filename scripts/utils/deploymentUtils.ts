@@ -12,6 +12,10 @@ import { KeyPairString } from "@near-js/crypto";
  */
 export function loadEnv(network: "mainnet" | "testnet"): {
   sponsorAccountId: string;
+  agentAccountId: string;
+  agentPrivateKey: KeyPairString;
+  proxyContractId: string;
+  proxyContractKey: KeyPairString;
   mpcContract: string;
   envPath: string;
 } {
@@ -24,11 +28,19 @@ export function loadEnv(network: "mainnet" | "testnet"): {
 
   const sponsorAccountId = process.env.SPONSOR_ACCOUNT!;
   const mpcContract = process.env.MPC_CONTRACT!;
+  const proxyContractId = process.env.PROXY_CONTRACT_ID!;
+  const proxyContractKey = process.env.PROXY_CONTRACT_KEY! as KeyPairString;
+  const agentAccountId = process.env.AGENT_ACCOUNT_ID!;
+  const agentPrivateKey = process.env.AGENT_PRIVATE_KEY! as KeyPairString;
 
   return {
     sponsorAccountId,
     mpcContract,
     envPath,
+    agentAccountId,
+    agentPrivateKey,
+    proxyContractId,
+    proxyContractKey,
   };
 }
 

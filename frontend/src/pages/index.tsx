@@ -49,7 +49,7 @@ export default function Home() {
    * BUGFIX: Callback for when user finishes registration.
    * - We'll call whoami with the freshToken,
    * - Put user in AuthContext with `login(...)`,
-   * - Then optionally begin a "create-portfolio" job in the background.
+   * - Then optionally begin a "create-account" job in the background.
    */
   const handleRegistered = async (freshToken: string) => {
     logger.info("handleRegistered() -> new user token:", freshToken);
@@ -62,10 +62,8 @@ export default function Home() {
       logger.info("whoami response after registration:", data);
 
       // Option 2: Start the portfolio job and wait for it to finish
-      logger.info(
-        "Starting create-portfolio job and waiting for completion..."
-      );
-      await startJob("create-portfolio", freshToken);
+      logger.info("Starting create-account job and waiting for completion...");
+      await startJob("create-account", freshToken);
 
       // Now that the job is finished, log the user in
       login(data.username, freshToken, data.userMetadata);
@@ -133,8 +131,6 @@ export default function Home() {
           <AuthenticatedDashboard
             username={username}
             accountMetadata={accountMetadata.contractMetadata}
-            portfolioData={accountMetadata.portfolioData}
-            agentIds={accountMetadata.agentIds}
             userBalance={userBalance}
             transactions={[]}
             copied={copied}

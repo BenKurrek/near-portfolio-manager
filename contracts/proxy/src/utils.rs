@@ -1,6 +1,11 @@
 //! src/utils.rs
 use crate::*;
-use near_sdk::{serde::Serialize, CurveType};
+use near_sdk::{serde::Serialize, CryptoHash, CurveType};
+
+/// Used to generate a unique prefix in our storage collections (this is to avoid data collisions)
+pub(crate) fn hash_string(string: &String) -> CryptoHash {
+    env::sha256_array(string.as_bytes())
+}
 
 /// Converts a `Vec<u8>` to a 64-byte array if possible.
 pub fn vec_to_64_byte_array(vec: Vec<u8>) -> Option<[u8; 64]> {

@@ -5,8 +5,6 @@ import { FiCopy } from "react-icons/fi";
 
 interface DashboardHeaderProps {
   username: string;
-  portfolioIds: string[];
-  agentIds: string[];
   userBalance: number;
   depositAddress?: string;
   copied: boolean;
@@ -16,8 +14,6 @@ interface DashboardHeaderProps {
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   username,
-  portfolioIds,
-  agentIds,
   userBalance,
   depositAddress,
   copied,
@@ -32,13 +28,6 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </div>
         <div>
           <h2 className="text-2xl font-extrabold">{username}</h2>
-          <p className="text-sm">
-            Portfolio IDs:{" "}
-            {portfolioIds.length ? portfolioIds.join(", ") : "N/A"}
-          </p>
-          <p className="text-sm">
-            Agents: {agentIds.length ? agentIds.join(", ") : "None"}
-          </p>
         </div>
       </div>
       <div className="flex items-center gap-8">

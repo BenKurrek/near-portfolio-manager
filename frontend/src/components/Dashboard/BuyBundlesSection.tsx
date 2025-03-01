@@ -2,24 +2,74 @@
 
 import React from "react";
 
-const tokenLogos: Record<string, string> = {
-  ETH: "/static/icons/network/ethereum.svg",
-  SOL: "/static/icons/network/solana.svg",
-  BTC: "/static/icons/network/btc.svg",
-  DOGE: "/static/icons/network/dogecoin.svg",
-  XRP: "/static/icons/network/xrpledger.svg",
-  NEAR: "/static/icons/network/near.svg",
+export interface TokenInfo {
+  name: string;
+  logo: string;
+  decimals: number;
+}
 
-  PEPE: "	https://s2.coinmarketcap.com/static/img/coins/128x128/24478.png",
-  WIF: "https://s2.coinmarketcap.com/static/img/coins/128x128/28752.png",
-  "Black Dragon":
-    "	https://s2.coinmarketcap.com/static/img/coins/128x128/29627.png",
-  AAVE: "https://s2.coinmarketcap.com/static/img/coins/128x128/7278.png",
-  UNI: "https://s2.coinmarketcap.com/static/img/coins/128x128/7083.png",
+export const tokenInformation: Record<string, TokenInfo> = {
+  ETH: {
+    name: "ETH",
+    logo: "/static/icons/network/ethereum.svg",
+    decimals: 18,
+  },
+  SOL: {
+    name: "SOL",
+    logo: "/static/icons/network/solana.svg",
+    decimals: 9,
+  },
+  BTC: {
+    name: "BTC",
+    logo: "/static/icons/network/btc.svg",
+    decimals: 8,
+  },
+  DOGE: {
+    name: "DOGE",
+    logo: "/static/icons/network/dogecoin.svg",
+    decimals: 8,
+  },
+  XRP: {
+    name: "XRP",
+    logo: "/static/icons/network/xrpledger.svg",
+    decimals: 6,
+  },
+  NEAR: {
+    name: "NEAR",
+    logo: "/static/icons/network/near.svg",
+    decimals: 24,
+  },
+  PEPE: {
+    name: "PEPE",
+    logo: "https://s2.coinmarketcap.com/static/img/coins/128x128/24478.png",
+    decimals: 1,
+  },
+  WIF: {
+    name: "WIF",
+    logo: "https://s2.coinmarketcap.com/static/img/coins/128x128/28752.png",
+    decimals: 1,
+  },
+  "Black Dragon": {
+    name: "Black Dragon",
+    logo: "https://s2.coinmarketcap.com/static/img/coins/128x128/29627.png",
+    decimals: 1,
+  },
+  AAVE: {
+    name: "AAVE",
+    logo: "https://s2.coinmarketcap.com/static/img/coins/128x128/7278.png",
+    decimals: 18,
+  },
+  UNI: {
+    name: "UNI",
+    logo: "https://s2.coinmarketcap.com/static/img/coins/128x128/7083.png",
+    decimals: 18,
+  },
 };
 
 export interface TokenDistribution {
-  symbol: string;
+  name: string;
+  logo: string;
+  decimals: number;
   percentage: number;
 }
 
@@ -68,11 +118,11 @@ const BuyBundlesSection: React.FC<BuyBundlesSectionProps> = ({
               {bundle.distribution.map((tokenItem, idx) => (
                 <div key={idx} className="flex items-center text-sm gap-2">
                   <img
-                    src={tokenLogos[tokenItem.symbol] || ""}
-                    alt={tokenItem.symbol}
+                    src={tokenInformation[tokenItem.name].logo || ""}
+                    alt={tokenItem.name}
                     className="w-5 h-5 object-contain"
                   />
-                  <span className="font-semibold">{tokenItem.symbol}</span>
+                  <span className="font-semibold">{tokenItem.name}</span>
                   <span className="text-gray-300">{tokenItem.percentage}%</span>
                 </div>
               ))}

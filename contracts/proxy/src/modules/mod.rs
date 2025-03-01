@@ -4,4 +4,5 @@
 
 pub mod balance_portfolio;
 pub mod create_portfolio;
+pub mod register_agent;
 pub mod withdraw_funds;

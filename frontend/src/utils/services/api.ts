@@ -2,6 +2,7 @@
 
 import axios, { AxiosInstance } from "axios";
 import { ContractMetadata } from "@src/utils/models/metadata";
+import { BundleQuote } from "@src/components/Dashboard/BuyBundleModal";
 
 /**
  * Create a pre-configured axios instance
@@ -108,19 +109,19 @@ export const apiService = {
   },
 
   /** Create portfolio (no more passing a pubkey) */
-  async createPortfolio(token: string) {
-    const res = await client.post("/auth/user/create-portfolio", { token });
-    return res.data; // { success, message, jobId, portfolioId }
+  async createAccount(token: string) {
+    const res = await client.post("/auth/user/create-account", { token });
+    return res.data;
   },
 
   /**
    * “Buy a bundle” is effectively the same or calls the same `balance_portfolio`.
    */
-  async buyBundle(token: string, bundleId: string, amount: number) {
+  async buyBundle(token: string, bundleId: string, quoteData: BundleQuote) {
     const res = await client.post("/auth/user/buy-bundle", {
       token,
       bundleId,
-      amount,
+      quoteData,
     });
     return res.data;
   },

@@ -1,7 +1,8 @@
 // src/pages/api/auth/utils/user.ts
 import prisma from "@src/db";
-import type { Portfolio, User as PrismaUser, Agent } from "@prisma/client";
-import { KeyPair } from "near-api-js";
+import type { User as PrismaUser } from "@prisma/client";
+import { Account } from "near-api-js";
+import { createAccount } from "../utils/near";
 
 /**
  * We'll define how each authenticator looks in code.
@@ -18,22 +19,17 @@ interface StoredAuthenticator {
  * from the PrismaUser and define it yourself.
  */
 export type ExtendedUser = Omit<PrismaUser, "authenticators"> & {
-  portfolios: Portfolio[];
-  agents: Agent[];
   authenticators: StoredAuthenticator[];
 };
 
 /**
- * Helper to parse `authenticators` from DB (stored as a JSON string).
+ * Helper to parse authenticators from DB (stored as a JSON string).
  */
 function parseAuthenticators(authStr?: string | null): StoredAuthenticator[] {
   if (!authStr) return [];
   try {
     const arr = JSON.parse(authStr);
-    if (Array.isArray(arr)) {
-      return arr;
-    }
-    return [];
+    return Array.isArray(arr) ? arr : [];
   } catch {
     return [];
   }
@@ -48,7 +44,6 @@ export async function getUserByUsername(
   const normalizedUsername = username.toLowerCase();
   const user = await prisma.user.findUnique({
     where: { username: normalizedUsername },
-    include: { portfolios: true, agents: true },
   });
   if (!user) return null;
 
@@ -64,9 +59,8 @@ export async function getUserByUsername(
 export async function getUserByCredentialId(
   credentialID: string
 ): Promise<ExtendedUser | null> {
-  const users = await prisma.user.findMany({
-    include: { portfolios: true, agents: true },
-  });
+  // No longer including portfolios or agents since the schema is simpler.
+  const users = await prisma.user.findMany();
   for (const user of users) {
     const auths = parseAuthenticators(user.authenticators?.toString());
     if (auths.some((auth) => auth.id === credentialID)) {
@@ -78,21 +72,16 @@ export async function getUserByCredentialId(
 
 /**
  * Create a new user with an empty "[]" for authenticators,
- * PLUS generate and store a random ED25519 key in `sudoKey`.
+ * PLUS generate and store a random ED25519 key in sudoKey.
  */
 export async function addUser(username: string): Promise<ExtendedUser> {
-  const normalizedUsername = username.toLowerCase();
-
-  // Generate a new random ED25519 key pair so the user always has a sudoKey
-  const keyPair = KeyPair.fromRandom("ed25519");
+  const normalizedUsername = username.replace(/\s+/g, "").toLowerCase();
 
   const user = await prisma.user.create({
     data: {
       username: normalizedUsername,
       authenticators: "[]", // store as JSON string
-      sudoKey: keyPair.toString(), // store the random private key
     },
-    include: { portfolios: true, agents: true },
   });
 
   return {
@@ -113,7 +102,7 @@ export async function addAuthenticatorToUser(
   if (!user) throw new Error("User not found.");
 
   const currentStr = user.authenticators || "[]";
-  const currentAuths = parseAuthenticators(currentStr?.toString());
+  const currentAuths = parseAuthenticators(currentStr.toString());
   currentAuths.push(authenticator);
 
   await prisma.user.update({
@@ -130,7 +119,7 @@ export async function addAuthenticatorToUser(
 
 /**
  * Optionally, if you have a contract that returns a deposit address after creation,
- * store that in userDepositAddress:
+ * store that in userDepositAddress.
  */
 export async function setUserContractData(
   userId: string,

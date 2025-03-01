@@ -23,7 +23,6 @@ export default async function handler(
   // 2) Fetch user by session.userId
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    include: { portfolios: true, agents: true },
   });
   if (!user) {
     return res.status(404).json({ error: "User not found" });
@@ -33,7 +32,8 @@ export default async function handler(
   const accountMetadata = {
     keys: { sudo_key: user.sudoKey || "" },
     contracts: {
-      userDepositAddress: user.userDepositAddress || "",
+      userDepositAddress: user.evmDepositAddress || "",
+      nearIntentsAddress: user.nearIntentsAddress || "",
     },
   };
 
@@ -41,8 +41,6 @@ export default async function handler(
     username: user.username,
     userMetadata: {
       contractMetadata: accountMetadata,
-      portfolioData: user.portfolios,
-      agentIds: user.agents.map((agent) => agent.publicKey),
     },
   });
 }

@@ -4,5 +4,5 @@ use crate::*;
 #[near(serializers = [json, borsh])]
 pub struct UserInfo {
     pub required_spread: PortfolioSpread,
-    pub near_intents_key: PublicKey,
+    pub near_intents_address: String,
 }

@@ -10,31 +10,15 @@ generator client {
 model User {
   id                 String  @id @default(uuid())
   username           String  @unique
+  nearAccountId      String? @unique
   sudoKey            String?
-  userDepositAddress String?
+  nearIntentsAddress String?
+  evmDepositAddress  String?
   authenticators     String? @default("[]")
 
-  portfolios Portfolio[]
-  agents     Agent[]
   sessions   Session[]
   challenges Challenge[]
   Job        Job[]
-}
-
-model Portfolio {
-  id      String  @id @default(uuid())
-  ownerId String
-  owner   User    @relation(fields: [ownerId], references: [id])
-  agents  Agent[]
-}
-
-model Agent {
-  id          String    @id @default(uuid())
-  publicKey   String
-  portfolioId String
-  portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
-  userId      String?
-  user        User?     @relation(fields: [userId], references: [id])
 }
 
 model Job {

@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use near_sdk::BorshStorageKey;
+use near_sdk::{BorshStorageKey, CryptoHash};
 
 use crate::*;
 
@@ -15,6 +15,7 @@ pub type PortfolioSpread = HashMap<String, f64>;
 pub enum StorageKey {
     UserInfo,
     AgentInfo,
+    AgentInfoInner { account_id_hash: CryptoHash },
     PortfolioInfo,
 }
 

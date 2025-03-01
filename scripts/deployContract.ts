@@ -7,7 +7,6 @@ import { KeyPair } from "@near-js/crypto";
 import path from "path";
 import { configureNetwork } from "./config";
 import { deployContract } from "./utils/deploy";
-import { formatNearAmount, parseNearAmount } from "@near-js/utils";
 import fs from "fs";
 
 async function main(): Promise<void> {
@@ -47,6 +46,7 @@ async function main(): Promise<void> {
 
     // Update .env with the newly created account
     updateEnv(envPath, "PROXY_CONTRACT_ID", contractId);
+    updateEnv(envPath, "PROXY_CONTRACT_KEY", fullAccessKey);
 
     // Save the full-access key to local key store for subsequent calls
     await config.nearKeyStore.setKey(
@@ -54,6 +54,7 @@ async function main(): Promise<void> {
       contractId,
       KeyPair.fromString(fullAccessKey),
     );
+    console.log("Done!");
 
     console.log(`${config.nearExplorerBaseUrl}/address/${contractId}`);
   } catch (error) {

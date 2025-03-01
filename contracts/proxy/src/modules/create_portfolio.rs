@@ -7,12 +7,12 @@ impl IntentsProxyMpcContract {
         &mut self,
         portolio_data: PortfolioSpread,
         agent_id: AccountId,
-        intents_key: PublicKey,
+        near_intents_address: String,
     ) {
         let owner_id = env::predecessor_account_id();
         let user = UserInfo {
             required_spread: portolio_data,
-            near_intents_key: intents_key,
+            near_intents_address,
         };
         self.user_info.insert(owner_id.clone(), user);
 

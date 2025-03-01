@@ -1,17 +1,19 @@
 // src/services/contractService.ts
 
 import { InMemoryKeyStore } from "near-api-js/lib/key_stores";
-import { KeyPair, Near } from "near-api-js";
+import { Account, KeyPair, Near } from "near-api-js";
 import { KeyPairString } from "near-api-js/lib/utils";
 
 export async function initNearConnection(
   networkId: string,
-  nodeUrl: string,
-  extraKeys?: Record<string, KeyPair>
-): Promise<Near> {
+  nodeUrl: string
+): Promise<{
+  near: Near;
+  agentAccount: Account;
+  sponsorAccount: Account;
+}> {
   const keyStore = new InMemoryKeyStore();
 
-  // Add your platform signer
   await keyStore.setKey(
     networkId,
     process.env.NEXT_PUBLIC_NEAR_PLATFORM_SIGNER_ID!,
@@ -20,13 +22,11 @@ export async function initNearConnection(
     )
   );
 
-  // If we’re also passing any agent key(s), store them
-  if (extraKeys) {
-    for (const [pubKey, keyPair] of Object.entries(extraKeys)) {
-      // We can treat the pubKey as an “accountId” for local usage
-      await keyStore.setKey(networkId, pubKey, keyPair);
-    }
-  }
+  await keyStore.setKey(
+    networkId,
+    process.env.NEXT_AGENT_ACCOUNT_ID!,
+    KeyPair.fromString(process.env.NEXT_AGENT_PRIVATE_KEY! as KeyPairString)
+  );
 
   const nearConfig = {
     networkId,
@@ -34,5 +34,15 @@ export async function initNearConnection(
     keyStore,
   };
 
-  return new Near(nearConfig);
+  const near = new Near(nearConfig);
+  const agentAccount = await near.account(process.env.NEXT_AGENT_ACCOUNT_ID!);
+  const sponsorAccount = await near.account(
+    process.env.NEXT_PUBLIC_NEAR_PLATFORM_SIGNER_ID!
+  );
+
+  return {
+    near,
+    agentAccount,
+    sponsorAccount,
+  };
 }

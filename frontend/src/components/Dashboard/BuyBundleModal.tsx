@@ -2,9 +2,7 @@
 import React, { useState, useContext, useEffect } from "react";
 import { apiService } from "@services/api";
 import { AuthContext } from "@context/AuthContext";
-// Import your big token list
 import type { TokenDistribution } from "./BuyBundlesSection";
-import { LIST_TOKENS } from "@src/constants/tokens";
 import { FlattenedToken } from "@src/types/tokens";
 import { BalanceContext } from "@src/context/BalanceContext";
 
@@ -18,10 +16,21 @@ const getDefuseAssetId = (
   return tokenInfo.defuseAssetId;
 };
 
-interface BundleQuote {
+export interface RawQuote {
+  amount_in: string;
+  amount_out: string;
+  defuse_asset_identifier_in: string;
+  defuse_asset_identifier_out: string;
+  expiration_time: string;
+  quote_hash: string;
+}
+
+export interface BundleQuote {
   success: boolean;
+  rawQuotes: RawQuote[];
   tokens: {
-    symbol: string;
+    logo: string;
+    name: string;
     amount: number; // how many tokens user would get
   }[];
 }
@@ -71,7 +80,7 @@ const BuyBundleModal: React.FC<BuyBundleModalProps> = ({
     return distribution.map((item) => {
       // Calculate the USDC amount allocated for this token
       const portion = (amount * item.percentage) / 100;
-      const tokenOutAssetId = getDefuseAssetId(allTokens, item.symbol);
+      const tokenOutAssetId = getDefuseAssetId(allTokens, item.name);
       return {
         defuse_asset_identifier_in: usdcAsset.defuseAssetId,
         defuse_asset_identifier_out: tokenOutAssetId,
@@ -100,12 +109,24 @@ const BuyBundleModal: React.FC<BuyBundleModalProps> = ({
       if (response.quotes) {
         // For example, you might want to reformat the response to display nicely
         // (assuming response.quotes is an array with one quote per token)
-        const tokens = response.quotes.map((quote: any, idx: number) => ({
-          symbol: distribution ? distribution[idx].symbol : "N/A",
-          // Assume each fetchQuote call returns an array and we take the first result:
-          amount: quote && quote[0] ? Number(quote[0].amount) : 0,
-        }));
-        setQuoteData({ success: true, tokens });
+        const rawQuotes = response.quotes.map((quote: RawQuote[]) =>
+          quote ? quote[0] : null
+        );
+        const tokens = rawQuotes.map((quote: any, idx: number) => {
+          if (!quote) return null;
+          if (!distribution) return null;
+
+          const tokenInformation = distribution[idx];
+          console.log("tokenInformation: ", tokenInformation);
+          const decimals = tokenInformation ? tokenInformation.decimals : 0;
+          return {
+            logo: tokenInformation ? tokenInformation.logo : "",
+            name: tokenInformation ? tokenInformation.name : "",
+            // Get the human readable
+            amount: quote && Number(quote.amount_out) / 10 ** decimals,
+          };
+        });
+        setQuoteData({ success: true, tokens, rawQuotes });
       } else {
         setError(response.message || "Failed to fetch quote.");
       }
@@ -125,7 +146,7 @@ const BuyBundleModal: React.FC<BuyBundleModalProps> = ({
     setLoading(true);
     setError("");
     try {
-      const response = await apiService.buyBundle(token, bundleId, amount);
+      const response = await apiService.buyBundle(token, bundleId, quoteData!);
       if (response.success) {
         onSuccess && onSuccess(response.jobId);
         alert(`Buy bundle initiated. Job ID: ${response.jobId}`);
@@ -184,8 +205,18 @@ const BuyBundleModal: React.FC<BuyBundleModalProps> = ({
             <div className="mt-4 space-y-2">
               <h3 className="text-lg font-semibold">You will receive:</h3>
               {quoteData.tokens.map((t) => (
-                <div key={t.symbol} className="flex justify-between text-sm">
-                  <span>{t.symbol}</span>
+                <div
+                  key={t.name}
+                  className="flex justify-between items-center text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={t.logo}
+                      alt={t.name}
+                      className="w-5 h-5 object-contain"
+                    />
+                    <span>{t.name}</span>
+                  </div>
                   <span className="font-mono">{t.amount.toFixed(6)}</span>
                 </div>
               ))}

@@ -1,4 +1,3 @@
-// src/context/BalanceContext.tsx
 import React, {
   createContext,
   useState,
@@ -17,6 +16,7 @@ import { FlattenedToken } from "@src/types/tokens";
 
 interface TokenBalance {
   token: any;
+  // Use a string for the formatted balance
   balance: string;
 }
 
@@ -38,10 +38,11 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
   const { accountMetadata } = useContext(AuthContext);
 
   // Memoize the deposit address so it doesn't change every render.
-  const depositAddress = useMemo(
-    () => accountMetadata?.contractMetadata?.contracts.userDepositAddress || "",
+  const intentsAddress = useMemo(
+    () => accountMetadata?.contractMetadata?.contracts.nearIntentsAddress || "",
     [accountMetadata]
   );
+  console.log("intentsAddress: ", intentsAddress);
 
   const [balances, setBalances] = useState<TokenBalance[]>([]);
 
@@ -58,7 +59,7 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
   const flattened = useMemo(() => flattenTokens(LIST_TOKENS), []);
 
   const refreshBalances = useCallback(async () => {
-    if (!depositAddress) {
+    if (!intentsAddress) {
       setBalances([]);
       return;
     }
@@ -66,20 +67,22 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
       const tokenIds = flattened.map((t) => t.defuseAssetId);
       const results = await fetchBatchBalances(
         config.nearNodeURL,
-        depositAddress,
+        intentsAddress,
         tokenIds
       );
-      console.log("results: ", results, "tokenIds: ", tokenIds);
+      // Convert each raw balance using its token's decimals
       const newBalances = flattened.map((token, idx) => ({
         token,
-        balance: results[idx] || "0",
+        balance: Number(
+          BigInt(results[idx] || "0") / BigInt(10 ** token.decimals)
+        ).toString(),
       }));
       setBalances(newBalances);
     } catch (error) {
       console.error("Error fetching balances:", error);
       setBalances([]);
     }
-  }, [depositAddress, flattened, config.nearNodeURL]);
+  }, [intentsAddress, flattened, config.nearNodeURL]);
 
   useEffect(() => {
     refreshBalances();

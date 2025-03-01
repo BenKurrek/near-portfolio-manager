@@ -18,10 +18,9 @@ export interface AuthMetadata {
     keys: { sudo_key: string };
     contracts: {
       userDepositAddress: string;
+      nearIntentsAddress: string;
     };
   };
-  portfolioData: any;
-  agentIds: string[];
 }
 
 interface AuthContextType {

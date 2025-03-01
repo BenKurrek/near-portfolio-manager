@@ -14,7 +14,7 @@ export async function fetchBatchBalances(
   try {
     const args_base64 = btoa(
       JSON.stringify({
-        account_id: depositAddress,
+        account_id: depositAddress.toLowerCase(),
         token_ids: tokenIds,
       })
     );
@@ -40,6 +40,7 @@ export async function fetchBatchBalances(
       body: JSON.stringify(reqData),
     });
     const data = await res.json();
+    console.log(data);
     const raw = data.result?.result;
     if (!raw) return tokenIds.map(() => "0");
 
