@@ -1,4 +1,5 @@
 use crate::*;
+use hex::decode;
 
 #[near]
 impl IntentsProxyMpcContract {
@@ -6,6 +7,7 @@ impl IntentsProxyMpcContract {
     pub fn balance_portfolio(
         &mut self,
         user_portfolio: AccountId,
+        hash: String,
         defuse_intents: DefuseIntents,
     ) -> Promise {
         let agent_id = env::predecessor_account_id();
@@ -19,19 +21,27 @@ impl IntentsProxyMpcContract {
             "Agent is not assigned to this portfolio!"
         );
 
-        // If any sub-intent is NOT a TokenDiff, we panic
-        for intent in &defuse_intents.intents {
-            match intent {
-                Intent::TokenDiff(_) => {
-                    // good
-                }
-                _ => {
-                    panic!("Only TokenDiff is allowed in balance_portfolio!");
-                }
-            }
-        }
+        // // If any sub-intent is NOT a TokenDiff, we panic
+        // for intent in &defuse_intents.intents {
+        //     match intent {
+        //         Intent::TokenDiff(_) => {
+        //             // good
+        //         }
+        //         _ => {
+        //             panic!("Only TokenDiff is allowed in balance_portfolio!");
+        //         }
+        //     }
+        // }
 
-        let final_hash = compute_erc191_hash(&defuse_intents);
+        let raw_bytes = decode(&hash[2..]).expect("Decoding hex failed");
+        let final_hash: [u8; 32] = vec_to_fixed(raw_bytes);
+        let final_hash2 = compute_erc191_hash(&defuse_intents);
+        require!(final_hash == final_hash2, "Hash mismatch!");
+        log!(
+            "contract hash: {}, passed in hash: {}",
+            bs58::encode(&final_hash).into_string(),
+            bs58::encode(&final_hash2).into_string()
+        );
         let sign_payload = MPCSignPayload {
             payload: final_hash,
             path: user_portfolio.to_string(),

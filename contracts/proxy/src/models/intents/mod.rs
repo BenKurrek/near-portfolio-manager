@@ -11,7 +11,10 @@ use tokens::{FtWithdraw, MtWithdraw, NativeWithdraw, NftWithdraw};
 #[near(serializers = [borsh, json])]
 #[derive(Debug, Clone)]
 pub struct DefuseIntents {
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub signer_id: String,
+    pub deadline: Option<String>, // can be null
+    pub nonce: String,
+    pub verifying_contract: String, // should be "intents.near"
     pub intents: Vec<Intent>,
 }
 

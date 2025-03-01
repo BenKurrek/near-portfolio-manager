@@ -46,6 +46,7 @@ export async function fetchBatchBalances(
 
     const decodedString = Buffer.from(raw).toString("utf-8");
     const balances = JSON.parse(decodedString);
+    console.log("balances: ", balances);
     // Expect an array of strings
     return balances;
   } catch (error) {

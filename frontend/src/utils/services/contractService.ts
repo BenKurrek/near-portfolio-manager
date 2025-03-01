@@ -6,11 +6,16 @@ import { KeyPairString } from "near-api-js/lib/utils";
 
 export async function initNearConnection(
   networkId: string,
-  nodeUrl: string
+  nodeUrl: string,
+  userInfo?: {
+    accountId: string;
+    secretKey: KeyPairString;
+  }
 ): Promise<{
   near: Near;
   agentAccount: Account;
   sponsorAccount: Account;
+  userAccount?: Account;
 }> {
   const keyStore = new InMemoryKeyStore();
 
@@ -28,6 +33,14 @@ export async function initNearConnection(
     KeyPair.fromString(process.env.NEXT_AGENT_PRIVATE_KEY! as KeyPairString)
   );
 
+  if (userInfo) {
+    await keyStore.setKey(
+      networkId,
+      userInfo.accountId,
+      KeyPair.fromString(userInfo.secretKey)
+    );
+  }
+
   const nearConfig = {
     networkId,
     nodeUrl,
@@ -39,10 +52,15 @@ export async function initNearConnection(
   const sponsorAccount = await near.account(
     process.env.NEXT_PUBLIC_NEAR_PLATFORM_SIGNER_ID!
   );
+  let userAccount;
+  if (userInfo) {
+    userAccount = await near.account(userInfo.accountId);
+  }
 
   return {
     near,
     agentAccount,
     sponsorAccount,
+    userAccount,
   };
 }

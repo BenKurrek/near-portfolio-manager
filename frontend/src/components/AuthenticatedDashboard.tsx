@@ -41,6 +41,14 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
   // Updated Bundles with distribution
   const bundles: BundleInfo[] = [
     {
+      id: "test",
+      title: "Test",
+      description: "A selection of the most stable tokens on the market.",
+      defaultAmount: 100,
+      icon: <i className="fas fa-gem text-brandAccent text-xl" />,
+      distribution: [{ ...tokenInformation.ETH, percentage: 100 }],
+    },
+    {
       id: "bluechip",
       title: "Blue-Chip Bundle",
       description: "A selection of the most stable tokens on the market.",

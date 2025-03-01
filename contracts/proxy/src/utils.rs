@@ -50,6 +50,8 @@ where
 {
     let json_str = serde_json::to_string(value).expect("Failed JSON-serialize");
     let prefix = format!("\x19Ethereum Signed Message:\n{}", json_str.len());
+    let combined_str = format!("{}{}", prefix, json_str);
+    log!("{}", combined_str);
     let combined = [prefix.as_bytes(), json_str.as_bytes()].concat();
     near_sdk::env::keccak256_array(&combined)
 }

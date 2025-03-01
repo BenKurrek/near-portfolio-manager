@@ -8,7 +8,7 @@ use near_sdk::{BorshStorageKey, CryptoHash};
 
 use crate::*;
 
-pub type PortfolioSpread = HashMap<String, f64>;
+pub type PortfolioSpread = HashMap<String, u64>;
 
 #[near]
 #[derive(BorshStorageKey)]

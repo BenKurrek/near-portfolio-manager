@@ -5,13 +5,13 @@ impl IntentsProxyMpcContract {
     #[payable]
     pub fn create_portfolio(
         &mut self,
-        portolio_data: PortfolioSpread,
+        portfolio_data: PortfolioSpread,
         agent_id: AccountId,
         near_intents_address: String,
     ) {
         let owner_id = env::predecessor_account_id();
         let user = UserInfo {
-            required_spread: portolio_data,
+            required_spread: portfolio_data,
             near_intents_address,
         };
         self.user_info.insert(owner_id.clone(), user);

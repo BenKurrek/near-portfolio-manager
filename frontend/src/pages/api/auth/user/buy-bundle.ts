@@ -3,9 +3,23 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@src/db";
 import { getSession } from "@api-utils/sessions";
 import { createJob, updateJobStep } from "@api-utils/jobs";
-import { generateAgentKeyPairFromTurnKey } from "@api-utils/crypto";
 import { configureNetwork } from "@src/utils/config";
 import { initNearConnection } from "@src/utils/services/contractService";
+import { postToNetwork, prepareSwapIntent } from "../utils/intents";
+import { BundleQuote } from "@src/components/Dashboard/BuyBundleModal";
+import { KeyPairString } from "near-api-js/lib/utils";
+import {
+  convertMpcSignatureToSecp256k1,
+  requestMpcSignature,
+} from "../utils/mpc";
+import { keccak256 } from "ethers";
+
+// Define an interface for the request body
+interface BuyBundleRequestBody {
+  token: string;
+  bundleId: string;
+  quoteData: BundleQuote;
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -17,8 +31,8 @@ export default async function handler(
       .json({ success: false, message: "Method not allowed" });
   }
 
-  const { token, bundleId, amount } = req.body;
-  if (!token || !bundleId || !amount) {
+  const { token, bundleId, quoteData } = req.body as BuyBundleRequestBody;
+  if (!token || !bundleId || !quoteData) {
     return res
       .status(400)
       .json({ success: false, message: "Missing parameters" });
@@ -33,9 +47,14 @@ export default async function handler(
   // 2) Fetch user
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    include: { portfolios: true },
   });
-  if (!user || !user.portfolios?.length || !user.sudoKey) {
+  if (
+    !user ||
+    !user.sudoKey ||
+    !user.nearIntentsAddress ||
+    !user.nearAccountId ||
+    !user.evmDepositAddress
+  ) {
     return res
       .status(400)
       .json({ success: false, message: "No portfolio or missing sudoKey" });
@@ -61,44 +80,85 @@ export default async function handler(
     // Step 2: Swap to Bundle
     await updateJobStep(jobId, "Swap to Bundle", "in-progress");
 
-    const networkId = process.env.NEXT_PUBLIC_APP_NETWORK_ID || "testnet";
-    const config = configureNetwork(networkId as "testnet" | "mainnet");
-
-    const { agentKeyPair, publicKey } = generateAgentKeyPairFromTurnKey(
-      user.sudoKey
-    );
-    const near2 = await initNearConnection(networkId, config.nearNodeURL, {
-      [publicKey]: agentKeyPair,
+    const { intents, quoteHashes } = await prepareSwapIntent({
+      providerQuotes: quoteData.rawQuotes,
+      nearIntentsAddress: user.nearIntentsAddress.toLowerCase(),
     });
-    const agentAccount = await near2.account(publicKey);
+    const networkId = process.env.NEXT_PUBLIC_APP_NETWORK_ID! as
+      | "mainnet"
+      | "testnet";
+    const config = configureNetwork(networkId);
+    const { agentAccount, userAccount } = await initNearConnection(
+      networkId,
+      config.nearNodeURL,
+      {
+        accountId: user.nearAccountId,
+        secretKey: user.sudoKey as KeyPairString,
+      }
+    );
     const contractId = process.env.NEXT_PUBLIC_CONTRACT_ID!;
 
-    // Example token diff – adjust according to your business logic
-    const diff = {
-      USDC: -amount,
-      ETH: 25,
-      PEPE: 25,
-    };
+    const mapping: Record<string, number> = {};
+    // Use the smaller length in case the arrays don't match perfectly.
+    const len = Math.min(quoteData.rawQuotes.length, quoteData.tokens.length);
+    for (let i = 0; i < len; i++) {
+      const assetIdOut = quoteData.rawQuotes[i].defuse_asset_identifier_out;
+      // Multiply by 100 so that 10% (10) becomes 1000
+      mapping[assetIdOut] = quoteData.tokens[i].percentage * 100;
+    }
+    // await userAccount!.functionCall({
+    //   contractId,
+    //   methodName: "create_portfolio",
+    //   args: {
+    //     agent_id: agentAccount.accountId,
+    //     near_intents_address: user.nearIntentsAddress,
+    //     portfolio_data: mapping,
+    //   },
+    //   gas: BigInt("300000000000000"),
+    //   attachedDeposit: BigInt("1"),
+    // });
 
-    const defuse_intents = {
-      intents: [
-        {
-          intent: "token_diff",
-          diff,
-        },
-      ],
-    };
+    // Add the ERC-191 prefix to the message
+    const intentsMessage = JSON.stringify(intents);
+    const prefix = `\x19Ethereum Signed Message:\n${intentsMessage.length}`;
+    const prefixedMessage = prefix + intentsMessage;
+    console.log("prefixedMessage: ", prefixedMessage);
 
-    await agentAccount.functionCall({
+    const encoded = new TextEncoder().encode(prefixedMessage);
+    // 2. Convert the payload to a UTF-8 byte array & compute a keccak256 hash
+    const hash = keccak256(encoded);
+
+    const signatures = await requestMpcSignature({
+      signerAccount: agentAccount,
       contractId,
       methodName: "balance_portfolio",
       args: {
-        portfolio_id: user.portfolios[0].id,
-        defuse_intents,
+        user_portfolio: user.nearAccountId,
+        hash,
+        defuse_intents: intents,
       },
-      gas: BigInt("300000000000000"),
-      attachedDeposit: BigInt("1"),
     });
+    console.log("FINAL signatures: ", signatures);
+
+    const formattedSignature = convertMpcSignatureToSecp256k1(signatures);
+    const signedData = {
+      standard: "erc191",
+      payload: JSON.stringify(intents),
+      signature: formattedSignature,
+    };
+    console.log("signedData: ", signedData);
+
+    const response = await postToNetwork({
+      url: "https://solver-relay-v2.chaindefuser.com/rpc",
+      methodName: "publish_intent",
+      args: {
+        signed_data: signedData,
+        quote_hashes: quoteHashes,
+      },
+    });
+    console.log("response: ", response);
+    const body = await response.json();
+    console.log("body: ", body);
 
     await updateJobStep(jobId, "Swap to Bundle", "completed");
 

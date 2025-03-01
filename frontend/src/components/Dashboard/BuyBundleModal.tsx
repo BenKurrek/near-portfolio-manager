@@ -29,6 +29,7 @@ export interface BundleQuote {
   success: boolean;
   rawQuotes: RawQuote[];
   tokens: {
+    percentage: number;
     logo: string;
     name: string;
     amount: number; // how many tokens user would get
@@ -120,6 +121,7 @@ const BuyBundleModal: React.FC<BuyBundleModalProps> = ({
           console.log("tokenInformation: ", tokenInformation);
           const decimals = tokenInformation ? tokenInformation.decimals : 0;
           return {
+            percentage: tokenInformation ? tokenInformation.percentage : 0,
             logo: tokenInformation ? tokenInformation.logo : "",
             name: tokenInformation ? tokenInformation.name : "",
             // Get the human readable

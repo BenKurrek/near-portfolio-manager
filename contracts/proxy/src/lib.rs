@@ -44,4 +44,12 @@ impl IntentsProxyMpcContract {
             mpc_contract_id,
         }
     }
+
+    pub fn set_mpc_contract_id(&mut self, mpc_contract_id: AccountId) {
+        require!(
+            env::predecessor_account_id() == env::current_account_id(),
+            "Only contract owner can register agents"
+        );
+        self.mpc_contract_id = mpc_contract_id;
+    }
 }
