@@ -94,7 +94,6 @@ Welcome to Fluxfolio! This repository contains everything you need to **deploy**
 │   ├── src/                    # React components, contexts, utils
 │   ├── prisma/                 # SQLite migrations/schema
 │   ├── package.json
-│   └── dockerfile
 ├── scripts/
 │   ├── env/                    # Example .env.* environment files for mainnet/testnet
 │   ├── deployContract.ts       # Script to deploy new contract accounts
@@ -131,22 +130,26 @@ npm install -g pnpm
 pnpm install
 ```
 
-### 2\. Bootstrap Scripts
+### 2\. Env Template
 
-We provide a `bootstrap.sh` script that:
+We provide a `.env.template` file in the frontend folder. This needs to be configured before the app can start:
 
-1.  Installs dependencies (via `pnpm install`)
-2.  Builds the contracts (via `./build.sh`)
-3.  Deploys the proxy contract (runs `pnpm run deploy:proxy`)
-4.  Registers the agent (runs `pnpm run deploy:register-agent`)
+```plaintext
+NEXT_PUBLIC_WEBAUTHN_RP_ID=localhost
+NEXT_PUBLIC_WEBAUTHN_ORIGIN=http://localhost:3000
+SESSION_PASSWORD=complex_password_at_least_32_characters_long
+NEXT_PUBLIC_APP_NETWORK_ID=mainnet
 
-To run it:
-
-```bash
-./bootstrap.sh
+NEXT_PUBLIC_CONTRACT_ID = proxy-1740901684353.near
+NEXT_AGENT_ACCOUNT_ID = agent-1740901697549.near
+NEXT_AGENT_PRIVATE_KEY = ed25519:v7Y17dAeFujQ8QB1AxZZg6qxkrv9RxCPfbDAMUkrnnStKWFjnPysJgEoapxaSx5UFhJWxNUQfiTPfNHuD9zNATm
+NEXT_PUBLIC_NEAR_PLATFORM_SIGNER_ID = SOME_SPONSOR_ACCOUNT
+NEXT_PUBLIC_NEAR_PLATFORM_SIGNER_KEY = SOME_SPONSOR_PRIVATE_KEY
 ```
 
-> **Note**: This script expects that you have already configured environment variables for your NEAR sponsor account, MPC contract, etc. If you just want to use **pre-built** contracts (i.e. you do **not** need to own your own NEAR contract accounts), see the next sections on environment setup.
+Place this in `frontend/` as `.env.mainnet`, and add the sponsor account and sponsor private key
+
+> **Note**: The `scripts/env/.env.mainnet` or `scripts/env/.env.testnet` files are used for **contract** deployments. The `frontend/.env.*` are for the Next.js **runtime** environment. You might share some variables but typically keep them separate.
 
 ### 3\. Optional: Deploy Your Own Contracts
 
@@ -158,6 +161,7 @@ Inside `frontend`, do:
 
 ```bash
 pnpm install
+pnpm db:start
 pnpm dev:mainnet
 ```
 
