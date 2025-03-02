@@ -53,7 +53,8 @@ coverage/
 # Environment Files
 # ----------------------
 .env
-.env.*
+.env.mainnet
+.env.testnet
 .env.local
 .env.development.local
 .env.test.local
