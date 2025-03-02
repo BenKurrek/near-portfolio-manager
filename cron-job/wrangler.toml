@@ -1,0 +1,7 @@
+name = "cron-job"
+main = "src/index.js"
+compatibility_date = "2025-02-25"
+workers_dev = true
+
+[triggers]
+crons = ["*/1 * * * *"]
