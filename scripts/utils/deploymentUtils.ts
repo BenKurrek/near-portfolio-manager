@@ -19,10 +19,22 @@ export function loadEnv(network: "mainnet" | "testnet"): {
   mpcContract: string;
   envPath: string;
 } {
+
   const envPath = path.join(__dirname, `../env/.env.${network}`);
   if (!fs.existsSync(envPath)) {
     throw new Error(`Environment file not found: ${envPath}`);
   }
+
+  Object.keys(process.env).forEach((key) => {
+    if (key.startsWith("SPONSOR_ACCOUNT") ||
+        key.startsWith("MPC_CONTRACT") ||
+        key.startsWith("PROXY_CONTRACT_ID") ||
+        key.startsWith("PROXY_CONTRACT_KEY") ||
+        key.startsWith("AGENT_ACCOUNT_ID") ||
+        key.startsWith("AGENT_PRIVATE_KEY")) {
+      delete process.env[key];
+    }
+  });
 
   dotenv.config({ path: envPath });
 

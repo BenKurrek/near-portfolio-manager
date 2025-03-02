@@ -97,6 +97,13 @@ export async function createAccountDeployContract({
     amount,
     config,
   });
+  console.log(keyPairString)
+  // Save the full-access key to local key store for subsequent calls
+  await config.nearKeyStore.setKey(
+    config.appNetwork,
+    newAccountId,
+    KeyPair.fromString(keyPairString),
+  );
 
   console.log("Deploying contract:", newAccountId);
   const accountObj = await near.account(newAccountId);

@@ -36,6 +36,7 @@ target/
 **/address.txt
 **/keys*.json
 metadata*.json
+!agent/src/metadata.json
 signature.json
 
 # If you only want to ignore certain .json files in a certain folder, 
@@ -59,6 +60,8 @@ coverage/
 .env.development.local
 .env.test.local
 .env.production.local
+
+.venv
 
 # ----------------------
 # Project-specific Folders to Ignore

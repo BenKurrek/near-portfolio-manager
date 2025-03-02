@@ -10,6 +10,7 @@
     "preinstall": "npx only-allow pnpm",
     "build": "./build.sh",
     "contract:patch": "./build.sh && ts-node scripts/patchContract.ts",
+    "contract:view-balance": "ts-node scripts/viewIntentsBalance.ts",
     "deploy:proxy": "ts-node scripts/deployContract.ts",
     "deploy:register-agent": "ts-node scripts/registerAgent.ts"
   },

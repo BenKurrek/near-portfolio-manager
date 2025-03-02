@@ -1,0 +1,4 @@
+nearai==0.1.13
+langchain-core
+langchain-openai
+pycryptodome

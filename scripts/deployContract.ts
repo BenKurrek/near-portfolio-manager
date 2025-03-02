@@ -57,6 +57,8 @@ async function main(): Promise<void> {
     console.log("Done!");
 
     console.log(`${config.nearExplorerBaseUrl}/address/${contractId}`);
+
+    // Add call to assign agent
   } catch (error) {
     console.error("Error deploying Beacon:", error);
     process.exit(1);
