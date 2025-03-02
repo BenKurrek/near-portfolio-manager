@@ -8,5 +8,9 @@
   "scripts": {
     "start": "wrangler dev",
     "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "bs58": "^6.0.0",
+    "tweetnacl": "^1.0.3"
   }
 }

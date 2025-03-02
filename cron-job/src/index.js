@@ -1,6 +1,6 @@
 // Import tweetnacl and bs58 for key decoding from a CDN.
-import nacl from "https://cdn.skypack.dev/tweetnacl?min";
-import { decode as bs58Decode } from "https://cdn.skypack.dev/bs58?min";
+import nacl from "tweetnacl";
+import bs58 from "bs58";
 
 // Generate a 32-byte random nonce as a hex string.
 function generateNonce() {
@@ -19,7 +19,7 @@ function signMessage(message, privateKeyBase58) {
     privateKeyBase58 = privateKeyBase58.slice(8);
   }
   // Decode the private key from base58.
-  const privateKey = bs58Decode(privateKeyBase58);
+  const privateKey = bs58.decode(privateKeyBase58);
   const encoder = new TextEncoder();
   const msgUint8 = encoder.encode(message);
   // Sign the message.
