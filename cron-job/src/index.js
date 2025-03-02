@@ -12,7 +12,6 @@ function generateNonce() {
 }
 
 // Sign the message using your private key.
-// Adjust this function if your signing process needs to include the nonce in a specific way.
 function signMessage(message, privateKeyBase58) {
   // Remove "ed25519:" prefix if present.
   if (privateKeyBase58.startsWith("ed25519:")) {
@@ -32,77 +31,89 @@ function signMessage(message, privateKeyBase58) {
   return btoa(binary);
 }
 
+// Helper function that encapsulates the scheduled logic.
+async function processTask(scheduledTime, env, ctx) {
+  console.log("Scheduled event triggered at:", scheduledTime);
+
+  // Retrieve your NEAR credentials from the Worker’s environment (set as secrets)
+  const accountId = env.NEAR_ACCOUNT_ID;
+  const publicKey = env.NEAR_PUBLIC_KEY;
+  const privateKey = env.NEAR_PRIVATE_KEY;
+
+  // Generate a fresh nonce.
+  const nonce = generateNonce();
+  // Define the message to sign.
+  const messageToSign = "Welcome to NEAR AI Hub!";
+  // Concatenate message and nonce.
+  const fullMessage = messageToSign + nonce;
+  // Sign the full message with your private key.
+  const signature = signMessage(fullMessage, privateKey);
+
+  // Build the dynamic auth token object.
+  const authToken = {
+    account_id: accountId,
+    public_key: publicKey,
+    signature: signature,
+    callback_url: "https://app.near.ai/",
+    message: messageToSign,
+    nonce: nonce,
+    recipient: "ai.near",
+  };
+
+  // Use the dynamic auth token in your Authorization header.
+  const url = "https://api.near.ai/v1/threads/runs";
+  const headers = {
+    "Content-Type": "application/json",
+    // The API expects the token as a JSON string after 'Bearer '.
+    Authorization: `Bearer ${JSON.stringify(authToken)}`,
+  };
+
+  // Define your API payload.
+  const data = {
+    agent_id: "flatirons.near/xela-agent/5.0.1",
+    thread_id: "a_previous_thread_id",
+    new_message: "Rebalance request",
+    max_iterations: "1",
+    env_vars: {
+      agent_id: "agent-1740901697549.near",
+      contract_id: "proxy-1740901684353.near",
+    },
+  };
+
+  try {
+    console.log("Sending request to NEAR AI API with dynamic auth...");
+    const response = await fetch(url, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    console.log("API Response:", JSON.stringify(result, null, 2));
+  } catch (error) {
+    console.error("Error during scheduled fetch:", error);
+  }
+
+  return new Response(`Scheduled task completed at ${scheduledTime}`);
+}
+
 export default {
-  // HTTP handler for test pings
+  // HTTP handler for test pings and temporary scheduled trigger.
   async fetch(request, env, ctx) {
-    const now = new Date().toISOString();
-    console.log("HTTP request received at:", now);
-    return new Response(`Test Ping: Worker is running. Time: ${now}`);
+    const url = new URL(request.url);
+    if (url.pathname === "/trigger-scheduled") {
+      // Call the scheduled logic when /trigger-scheduled is accessed.
+      const now = new Date().toISOString();
+      return await processTask(now, env, ctx);
+    } else {
+      const now = new Date().toISOString();
+      console.log("HTTP request received at:", now);
+      return new Response(`Test Ping: Worker is running. Time: ${now}`);
+    }
   },
 
-  // Scheduled handler – normally triggered by a CRON job in production
+  // Scheduled handler – normally triggered by a CRON job in production.
   async scheduled(event, env, ctx) {
     const scheduledTime = new Date(event.scheduledTime).toISOString();
-    console.log("Scheduled event triggered at:", scheduledTime);
-
-    // Retrieve your NEAR credentials from the Worker’s environment (set as secrets)
-    const accountId = env.NEAR_ACCOUNT_ID; // e.g., "zachman.near"
-    const publicKey = env.NEAR_PUBLIC_KEY; // e.g., "ed25519:54esjzDMmVydh17eHVkHGSFrX7cos5PEzuDsXTZG7FQd"
-    const privateKey = env.NEAR_PRIVATE_KEY; // e.g., "ed25519:..." (stored without exposure)
-
-    // Generate a fresh nonce
-    const nonce = generateNonce();
-    // Define the message to sign (you can adjust this as needed)
-    const messageToSign = "Welcome to NEAR AI Hub!";
-    // Concatenate message and nonce (if required by the signing scheme)
-    const fullMessage = messageToSign + nonce;
-    // Sign the full message with your private key
-    const signature = signMessage(fullMessage, privateKey);
-
-    // Build the dynamic auth token object
-    const authToken = {
-      account_id: accountId,
-      public_key: publicKey,
-      signature: signature,
-      callback_url: "https://app.near.ai/", // Adjust if needed
-      message: messageToSign,
-      nonce: nonce,
-      recipient: "ai.near",
-    };
-
-    // Use the dynamic auth token in your Authorization header
-    const url = "https://api.near.ai/v1/threads/runs";
-    const headers = {
-      "Content-Type": "application/json",
-      // The API expects the token as a JSON string after 'Bearer '
-      Authorization: `Bearer ${JSON.stringify(authToken)}`,
-    };
-
-    // Define your API payload
-    const data = {
-      agent_id: "flatirons.near/xela-agent/5.0.1",
-      thread_id: "a_previous_thread_id",
-      new_message: "Rebalance request",
-      max_iterations: "1",
-      env_vars: {
-        agent_id: "agent-1740901697549.near",
-        contract_id: "proxy-1740901684353.near",
-      },
-    };
-
-    try {
-      console.log("Sending request to NEAR AI API with dynamic auth...");
-      const response = await fetch(url, {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(data),
-      });
-      const result = await response.json();
-      console.log("API Response:", JSON.stringify(result, null, 2));
-    } catch (error) {
-      console.error("Error during scheduled fetch:", error);
-    }
-
-    return new Response(`Scheduled task completed at ${scheduledTime}`);
+    return await processTask(scheduledTime, env, ctx);
   },
 };
