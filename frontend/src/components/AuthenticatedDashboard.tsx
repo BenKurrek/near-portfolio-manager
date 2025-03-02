@@ -24,6 +24,7 @@ interface AuthenticatedDashboardProps {
   handleDepositClick: () => void;
   copied: boolean;
   setCopied: React.Dispatch<React.SetStateAction<boolean>>;
+  balancerChartData: any;
 }
 
 const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
@@ -34,20 +35,13 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
   handleDepositClick,
   copied,
   setCopied,
+  balancerChartData,
 }) => {
   const [buyModalOpen, setBuyModalOpen] = useState(false);
   const [selectedBundle, setSelectedBundle] = useState<BundleInfo | null>(null);
 
   // Updated Bundles with distribution
   const bundles: BundleInfo[] = [
-    {
-      id: "test",
-      title: "Test",
-      description: "A selection of the most stable tokens on the market.",
-      defaultAmount: 100,
-      icon: <i className="fas fa-gem text-brandAccent text-xl" />,
-      distribution: [{ ...tokenInformation.ETH, percentage: 100 }],
-    },
     {
       id: "bluechip",
       title: "Blue-Chip Bundle",
@@ -90,21 +84,11 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
     },
   ];
 
-  const balancerChartData = {
-    labels: ["USDC", "ETH", "Others"],
-    datasets: [
-      {
-        label: "Allocation",
-        data: [50, 25, 25],
-        backgroundColor: ["#8ECAE6", "#219EBC", "#FFB703"],
-      },
-    ],
-  };
-
   const handleBuyClick = (bundle: BundleInfo) => {
     setSelectedBundle(bundle);
     setBuyModalOpen(true);
   };
+  console.log("accountMetadata: ", balancerChartData);
 
   return (
     <div className="mt-8 space-y-12 bg-brandDark min-h-screen px-4 py-8 text-gray-100">
@@ -127,7 +111,7 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
 
       <BuyBundlesSection bundles={bundles} onBuyClick={handleBuyClick} />
 
-      <PortfolioBalancer chartData={balancerChartData} />
+      <PortfolioBalancer portfolioData={balancerChartData} />
 
       <TransactionHistory transactions={transactions} />
 
@@ -138,12 +122,14 @@ const AuthenticatedDashboard: React.FC<AuthenticatedDashboardProps> = ({
           bundleTitle={selectedBundle.title}
           defaultAmount={selectedBundle.defaultAmount}
           distribution={selectedBundle.distribution}
+          userBalance={userBalance} // <-- Pass down your USDC balance
           onClose={() => {
             setBuyModalOpen(false);
             setSelectedBundle(null);
           }}
           onSuccess={(jobId) => {
             console.log("Buy bundle initiated with jobId:", jobId);
+            // Maybe trigger a refetch of user balance or display a toast
           }}
         />
       )}

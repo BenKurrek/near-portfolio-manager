@@ -1,12 +1,13 @@
-// Inside BuyBundleModal.tsx
 import React, { useState, useContext, useEffect } from "react";
-import { apiService } from "@services/api";
 import { AuthContext } from "@context/AuthContext";
+import { BalanceContext } from "@src/context/BalanceContext";
 import type { TokenDistribution } from "./BuyBundlesSection";
 import { FlattenedToken } from "@src/types/tokens";
-import { BalanceContext } from "@src/context/BalanceContext";
+import { apiService } from "@services/api";
+import ModalHeader from "@src/components/ModalHeader";
+import { PriceContext } from "@src/context/PriceContext";
 
-// Optionally, define a helper to extract a token’s defuse asset id:
+// Helper to get the matching defuse assetId for each token
 const getDefuseAssetId = (
   allTokens: FlattenedToken[],
   symbol: string
@@ -32,6 +33,7 @@ export interface BundleQuote {
     percentage: number;
     logo: string;
     name: string;
+    usdPrice: number;
     amount: number; // how many tokens user would get
   }[];
 }
@@ -41,9 +43,10 @@ interface BuyBundleModalProps {
   bundleId: string;
   bundleTitle: string;
   defaultAmount: number;
+  distribution?: TokenDistribution[];
+  userBalance: number; // Pass in the user’s total USDC
   onClose: () => void;
   onSuccess?: (jobId: string) => void;
-  distribution?: TokenDistribution[];
 }
 
 const BuyBundleModal: React.FC<BuyBundleModalProps> = ({
@@ -51,35 +54,37 @@ const BuyBundleModal: React.FC<BuyBundleModalProps> = ({
   bundleId,
   bundleTitle,
   defaultAmount,
+  distribution,
+  userBalance,
   onClose,
   onSuccess,
-  distribution,
 }) => {
   const { token } = useContext(AuthContext);
+  const { prices } = useContext(PriceContext);
   const { allTokens } = useContext(BalanceContext);
+
   const [amount, setAmount] = useState<number>(defaultAmount);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>("");
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteData, setQuoteData] = useState<BundleQuote | null>(null);
+  const [error, setError] = useState<string>("");
+  const [loadingPurchase, setLoadingPurchase] = useState(false);
 
+  // Reset quote if user changes the amount
   useEffect(() => {
-    // Reset quote when user changes the amount
     setQuoteData(null);
   }, [amount]);
 
   if (!isOpen) return null;
 
-  // Helper: Build an array of quote requests from the bundle distribution
+  const userHasInsufficientBalance = amount > userBalance;
+
   const buildQuoteRequests = () => {
     if (!distribution) return [];
-    // For USDC “in”, you could pick one of the USDC tokens from your list.
-    // For example, here we take the first USDC grouped token.
+    // For USDC “in”, pick the user’s USDC token from allTokens
     const usdcAsset = allTokens.find((t) => t.symbol === "USDC");
     if (!usdcAsset) return [];
 
     return distribution.map((item) => {
-      // Calculate the USDC amount allocated for this token
       const portion = (amount * item.percentage) / 100;
       const tokenOutAssetId = getDefuseAssetId(allTokens, item.name);
       return {
@@ -98,37 +103,49 @@ const BuyBundleModal: React.FC<BuyBundleModalProps> = ({
       setError("You must be logged in to get a quote.");
       return;
     }
+
+    // If user has insufficient funds, do not proceed
+    if (userHasInsufficientBalance) {
+      setError("You do not have enough USDC to purchase this bundle.");
+      return;
+    }
+
     setQuoteLoading(true);
     setError("");
     setQuoteData(null);
 
     try {
-      const items = buildQuoteRequests();
-      // Call our new API route that handles multiple quote requests
-      const response = await apiService.getBundleQuotes(token, items);
-      console.log("response: ", response);
-      if (response.quotes) {
-        // For example, you might want to reformat the response to display nicely
-        // (assuming response.quotes is an array with one quote per token)
-        const rawQuotes = response.quotes.map((quote: RawQuote[]) =>
-          quote ? quote[0] : null
-        );
-        const tokens = rawQuotes.map((quote: any, idx: number) => {
-          if (!quote) return null;
-          if (!distribution) return null;
+      const quoteRequests = buildQuoteRequests();
+      if (quoteRequests.length === 0) {
+        setError("No tokens found in this bundle distribution.");
+        return;
+      }
 
-          const tokenInformation = distribution[idx];
-          console.log("tokenInformation: ", tokenInformation);
-          const decimals = tokenInformation ? tokenInformation.decimals : 0;
-          return {
-            percentage: tokenInformation ? tokenInformation.percentage : 0,
-            logo: tokenInformation ? tokenInformation.logo : "",
-            name: tokenInformation ? tokenInformation.name : "",
-            // Get the human readable
-            amount: quote && Number(quote.amount_out) / 10 ** decimals,
-          };
-        });
-        setQuoteData({ success: true, tokens, rawQuotes });
+      // Suppose your backend route returns { quotes: RawQuote[][] }
+      const response = await apiService.getBundleQuotes(token, quoteRequests);
+
+      if (response.quotes) {
+        // Flatten the first RawQuote of each array
+        const rawQuotes: RawQuote[] = response.quotes.map(
+          (quoteArray: RawQuote[]) => (quoteArray ? quoteArray[0] : null)
+        );
+
+        const tokens = rawQuotes
+          .map((rawQuote, index) => {
+            if (!rawQuote || !distribution) return null;
+            const dItem = distribution[index];
+            const decimals = dItem.decimals || 0;
+            return {
+              percentage: dItem.percentage,
+              logo: dItem.logo,
+              name: dItem.name,
+              amount: Number(rawQuote.amount_out) / 10 ** decimals,
+              usdPrice: prices[dItem.name],
+            };
+          })
+          .filter(Boolean) as BundleQuote["tokens"];
+
+        setQuoteData({ success: true, rawQuotes, tokens });
       } else {
         setError(response.message || "Failed to fetch quote.");
       }
@@ -140,17 +157,25 @@ const BuyBundleModal: React.FC<BuyBundleModalProps> = ({
     }
   };
 
-  const handleConfirm = async () => {
-    if (!token) {
-      setError("You must be logged in.");
+  const handlePurchase = async () => {
+    if (!token || !quoteData) {
+      setError("Please get a quote first.");
       return;
     }
-    setLoading(true);
+    if (userHasInsufficientBalance) {
+      setError("Insufficient USDC balance.");
+      return;
+    }
+
+    setLoadingPurchase(true);
     setError("");
+
     try {
-      const response = await apiService.buyBundle(token, bundleId, quoteData!);
+      const response = await apiService.buyBundle(token, bundleId, quoteData);
+
       if (response.success) {
-        onSuccess && onSuccess(response.jobId);
+        if (onSuccess) onSuccess(response.jobId);
+        // Optionally show a toast or alert
         alert(`Buy bundle initiated. Job ID: ${response.jobId}`);
         onClose();
       } else {
@@ -160,88 +185,118 @@ const BuyBundleModal: React.FC<BuyBundleModalProps> = ({
       console.error("Error buying bundle:", err);
       setError("An error occurred while buying the bundle.");
     } finally {
-      setLoading(false);
+      setLoadingPurchase(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
-      <div className="relative w-full max-w-md m-4 rounded-lg shadow-lg bg-brandDark text-gray-100 p-6">
-        <h2 className="text-xl font-bold mb-4">Buy {bundleTitle}</h2>
+  // Decide which button label & action to show
+  const buttonLabel = quoteData ? "Purchase Bundle" : "Get Quote";
+  const buttonAction = quoteData ? handlePurchase : handleGetQuote;
+  const isButtonLoading = quoteData ? loadingPurchase : quoteLoading;
 
-        <label className="block mb-2">
-          <span className="text-sm">Amount (in USDC)</span>
+  // Button disabled conditions:
+  //  - If user has insufficient funds
+  //  - If no positive amount is entered
+  //  - If we’re in the middle of an action (loading)
+  const isButtonDisabled =
+    isButtonLoading || userHasInsufficientBalance || amount <= 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+      <div className="bg-brandDark text-gray-100 rounded-lg w-full max-w-md p-6 relative">
+        {/* Modal Header */}
+        <ModalHeader title={`Buy ${bundleTitle}`} onClose={onClose} />
+
+        {/* Distribution Logos (shown by default) */}
+        {distribution && (
+          <div className="flex flex-wrap gap-3 mb-4">
+            {distribution.map((dItem, i) => (
+              <div
+                key={`${dItem.name}-${i}`}
+                className="flex items-center space-x-2 bg-gray-700 px-2 py-1 rounded"
+              >
+                <img
+                  src={dItem.logo}
+                  alt={dItem.name}
+                  className="w-5 h-5 object-contain"
+                />
+                <span className="text-sm font-semibold">{dItem.name}</span>
+                <span className="text-xs text-gray-400">
+                  {dItem.percentage}%
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Amount in USDC */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1">
+            Amount (USDC)
+          </label>
           <input
             type="number"
+            min={0}
             value={amount}
-            onChange={(e) => setAmount(parseFloat(e.target.value))}
-            min="1"
-            className="w-full p-2 mt-1 rounded bg-gray-700 text-gray-100"
+            onChange={(e) => {
+              const val = parseFloat(e.target.value) || 0;
+              setAmount(val);
+            }}
+            className="w-full p-2 rounded bg-gray-700 focus:outline-none placeholder-gray-400"
           />
-        </label>
-
-        {/* Quote Section */}
-        <div className="mt-4">
-          {!quoteData && !quoteLoading && (
-            <button
-              className="btn btn-secondary"
-              onClick={handleGetQuote}
-              disabled={!amount}
-            >
-              Get Quote
-            </button>
-          )}
-
-          {quoteLoading && (
-            <div className="mt-4">
-              <p className="text-sm text-gray-400 mb-2">Fetching quote...</p>
-              <div className="w-full flex flex-col gap-2 animate-pulse">
-                <div className="h-4 bg-gray-600 rounded w-3/4"></div>
-                <div className="h-4 bg-gray-600 rounded w-1/2"></div>
-                <div className="h-4 bg-gray-600 rounded w-2/3"></div>
-              </div>
-            </div>
-          )}
-
-          {quoteData && !quoteLoading && (
-            <div className="mt-4 space-y-2">
-              <h3 className="text-lg font-semibold">You will receive:</h3>
-              {quoteData.tokens.map((t) => (
-                <div
-                  key={t.name}
-                  className="flex justify-between items-center text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={t.logo}
-                      alt={t.name}
-                      className="w-5 h-5 object-contain"
-                    />
-                    <span>{t.name}</span>
-                  </div>
-                  <span className="font-mono">{t.amount.toFixed(6)}</span>
-                </div>
-              ))}
-            </div>
+          {userHasInsufficientBalance && amount > 0 && (
+            <p className="text-sm text-red-400 mt-1">
+              You only have {userBalance.toLocaleString()} USDC available.
+            </p>
           )}
         </div>
 
-        {error && <p className="text-red-400 mb-2 mt-4">{error}</p>}
+        {/* If a quote is fetched, display the approximate token amounts */}
+        {quoteData && (
+          <div className="bg-gray-800 p-3 rounded mb-4 text-sm space-y-2">
+            <p className="text-gray-200 font-semibold">
+              You will receive approximately:
+            </p>
+            {quoteData.tokens.map((t) => (
+              <div
+                key={t.name}
+                className="flex items-center justify-between bg-gray-700 p-2 rounded"
+              >
+                <div className="flex items-center space-x-2">
+                  <img
+                    src={t.logo}
+                    alt={t.name}
+                    className="w-5 h-5 object-contain"
+                  />
+                  <span>{t.name}</span>
+                </div>
+                <span className="font-mono">
+                  {t.amount.toFixed(6)} (~$
+                  {Number(
+                    Number(t.amount.toFixed(6)) * Number(t.usdPrice.toFixed(2))
+                  ).toFixed(2)}
+                  )
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
-        <div className="flex justify-end gap-4 mt-4">
+        {/* Error Message */}
+        {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
+
+        {/* Bottom Right Action Button */}
+        <div className="flex justify-end">
           <button
-            onClick={onClose}
-            className="btn btn-outline hover:bg-gray-700"
-            disabled={loading}
+            onClick={buttonAction}
+            disabled={isButtonDisabled}
+            className={`${
+              isButtonDisabled
+                ? "bg-gray-500 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-500"
+            } text-white px-4 py-2 rounded transition-colors`}
           >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            className="btn btn-primary"
-            disabled={loading || !quoteData}
-          >
-            {loading ? "Processing..." : "Confirm Purchase"}
+            {isButtonLoading ? "Please wait..." : buttonLabel}
           </button>
         </div>
       </div>

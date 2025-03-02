@@ -8,10 +8,12 @@ import LoginModal from "@modals/LoginModal";
 import DepositModal from "@modals/DepositModal";
 import AuthenticatedDashboard from "@components/AuthenticatedDashboard";
 import LoadingOverlay from "@components/LoadingOverlay/LoadingOverlay";
+import SkeletonLoader from "@components/SkeletonLoader";
 import type { AuthMetadata } from "@context/AuthContext";
 import { configureNetwork } from "@src/utils/config";
 import { logger } from "@src/utils/logger";
 import { apiService } from "@services/api";
+import { PriceContext } from "@src/context/PriceContext";
 
 export default function Home() {
   const { username, token, accountMetadata, login, logout } =
@@ -21,13 +23,80 @@ export default function Home() {
   const { currentJobId, jobSteps, startJob, clearJob } = useContext(JobContext);
 
   // BalanceContext for user token balances
-  const { balances } = useContext(BalanceContext);
+  const { balances, loading: balancesLoading } = useContext(BalanceContext);
+  const { prices } = useContext(PriceContext);
+  console.log("balances: ", balances);
+
+  // Calculate user’s USDC total
   const usdcItems = balances.filter((b) => b.token.symbol === "USDC");
-  const totalBalance = usdcItems.reduce(
+  const totalUsdcBalance = usdcItems.reduce(
     (sum, item) => sum + Number(item.balance),
     0
   );
-  const userBalance = parseFloat(totalBalance.toString());
+  const userBalance = parseFloat(totalUsdcBalance.toString());
+
+  // For the portfolio chart, we do a quick USD aggregator:
+  //   tokenValue = tokenBalance * prices[symbol].
+  const nonUsdcBalances = balances.filter((b) => b.token.symbol !== "USDC");
+
+  const aggregatedUSD = nonUsdcBalances.reduce((acc, item) => {
+    const symbol = item.token.symbol;
+    const price = prices[symbol] || 0; // fallback if missing
+    const usdValue = parseFloat(item.balance) * price;
+    if (acc[symbol]) {
+      acc[symbol] += usdValue;
+    } else {
+      acc[symbol] = usdValue;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
+  const totalNonUsdcBalance = Object.values(aggregatedUSD).reduce(
+    (sum, v) => sum + v,
+    0
+  );
+
+  // Build a tokens array for the chart
+  const tokens = Object.keys(aggregatedUSD).map((symbol) => {
+    const tokenItem = nonUsdcBalances.find((b) => b.token.symbol === symbol);
+    const value = aggregatedUSD[symbol];
+    const percentage = totalNonUsdcBalance
+      ? (value / totalNonUsdcBalance) * 100
+      : 0;
+
+    return {
+      name: symbol,
+      logo: tokenItem?.token.icon || "",
+      percentage: parseFloat(percentage.toFixed(2)),
+      // We can pass the "price" along for display
+      usdPrice: prices[symbol] || 0,
+      value,
+    };
+  });
+
+  // Chart data
+  const colors = [
+    "#8ECAE6",
+    "#219EBC",
+    "#FFB703",
+    "#FFC6FF",
+    "#A0C4FF",
+    "#BDB2FF",
+  ];
+  const portfolioData = {
+    tokens,
+    totalBalance: totalNonUsdcBalance,
+    labels: Object.keys(aggregatedUSD),
+    datasets: [
+      {
+        label: "USD Balance",
+        data: Object.values(aggregatedUSD),
+        backgroundColor: Object.keys(aggregatedUSD).map(
+          (_, i) => colors[i % colors.length]
+        ),
+      },
+    ],
+  };
 
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showDepositModal, setShowDepositModal] = useState<boolean>(false);
@@ -50,37 +119,24 @@ export default function Home() {
   };
 
   /**
-   * BUGFIX: Callback for when user finishes registration.
-   * - We'll call whoami with the freshToken,
-   * - Put user in AuthContext with `login(...)`,
-   * - Then optionally begin a "create-account" job in the background.
+   * Callbacks for registration and login (unchanged)
    */
   const handleRegistered = async (freshToken: string) => {
     logger.info("handleRegistered() -> new user token:", freshToken);
     setShowLoginModal(false);
-
     try {
-      // Option 1: Fetch whoami first if you need the user data
       logger.info("Fetching whoami after registration...");
       const data = await apiService.whoami(freshToken);
       logger.info("whoami response after registration:", data);
-
-      // Option 2: Start the portfolio job and wait for it to finish
       logger.info("Starting create-account job and waiting for completion...");
       await startJob("create-account", freshToken);
-
-      // Now that the job is finished, log the user in
       login(data.username, freshToken, data.userMetadata);
       logger.info("User is now logged in after portfolio creation.");
     } catch (err) {
       logger.error("Error finalizing registration or creating portfolio:", err);
-      // Optionally, show an error message to the user
     }
   };
 
-  /**
-   * Callback for when a user logs in
-   */
   const handleLoggedIn = (
     uname: string,
     tok: string,
@@ -96,7 +152,6 @@ export default function Home() {
       {/* HEADER */}
       <header className="bg-brandDark shadow z-10 sticky top-0">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          {/* Brand */}
           <div className="flex items-center space-x-2">
             <svg
               className="w-8 h-8 text-brandAccent"
@@ -115,7 +170,6 @@ export default function Home() {
               Fluxfolio
             </h1>
           </div>
-
           {accountMetadata && (
             <button
               onClick={handleLogout}
@@ -129,9 +183,18 @@ export default function Home() {
 
       {/* MAIN */}
       <main className="flex-grow max-w-7xl mx-auto w-full p-6">
+        {/* 1) If not logged in, show hero */}
         {!accountMetadata ? (
           <UnauthenticatedHero onGetStarted={() => setShowLoginModal(true)} />
+        ) : /* 2) If we have accountMetadata, but still loading balances, show skeleton */
+        balancesLoading ? (
+          <div className="space-y-6 animate-pulse">
+            <div className="h-12 w-1/2 bg-gray-700 rounded"></div>
+            <div className="h-64 w-full bg-gray-700 rounded"></div>
+            <div className="h-40 w-full bg-gray-700 rounded"></div>
+          </div>
         ) : (
+          /* 3) Otherwise, show the actual dashboard */
           <AuthenticatedDashboard
             username={username}
             accountMetadata={accountMetadata.contractMetadata}
@@ -140,6 +203,7 @@ export default function Home() {
             copied={copied}
             setCopied={setCopied}
             handleDepositClick={() => setShowDepositModal(true)}
+            balancerChartData={portfolioData}
           />
         )}
 
