@@ -20,6 +20,10 @@ export interface AuthMetadata {
       userDepositAddress: string;
       nearIntentsAddress: string;
     };
+    userInfo?: {
+      required_spread: any;
+      activities: string[];
+    };
   };
 }
 

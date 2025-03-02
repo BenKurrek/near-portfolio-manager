@@ -65,8 +65,8 @@ export const apiService = {
   },
 
   // ------------------- AUTH LOGIN -------------------
-  async getLoginOptions() {
-    const res = await client.post("/auth/login/options", {});
+  async getLoginOptions(username: string) {
+    const res = await client.post("/auth/login/options", { username });
     return res.data; // { challenge, allowCredentials, ... }
   },
 

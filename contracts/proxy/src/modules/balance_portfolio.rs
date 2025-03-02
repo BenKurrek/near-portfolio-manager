@@ -21,17 +21,36 @@ impl IntentsProxyMpcContract {
             "Agent is not assigned to this portfolio!"
         );
 
-        // // If any sub-intent is NOT a TokenDiff, we panic
-        // for intent in &defuse_intents.intents {
-        //     match intent {
-        //         Intent::TokenDiff(_) => {
-        //             // good
-        //         }
-        //         _ => {
-        //             panic!("Only TokenDiff is allowed in balance_portfolio!");
-        //         }
-        //     }
-        // }
+        // Update the user's activities vector with any TokenDiff intents as stringified JSON
+        let user = self
+            .user_info
+            .get_mut(&user_portfolio)
+            .expect("User not found");
+        for intent in &defuse_intents.intents {
+            if let Intent::TokenDiff(token_diff) = intent {
+                // Create JSON object with agent_id, timestamp, and diffs (the TokenDiff)
+                let json_value = serde_json::json!({
+                    "agent_id": agent_id,
+                    "timestamp": env::block_timestamp(),
+                    "diffs": token_diff,
+                });
+                let json_str =
+                    serde_json::to_string(&json_value).expect("Failed to serialize TokenDiff");
+                user.activities.push(json_str);
+            }
+        }
+
+        // If any sub-intent is NOT a TokenDiff, we panic
+        for intent in &defuse_intents.intents {
+            match intent {
+                Intent::TokenDiff(_) => {
+                    // good
+                }
+                _ => {
+                    panic!("Only TokenDiff is allowed in balance_portfolio!");
+                }
+            }
+        }
 
         let raw_bytes = decode(&hash[2..]).expect("Decoding hex failed");
         let final_hash: [u8; 32] = vec_to_fixed(raw_bytes);

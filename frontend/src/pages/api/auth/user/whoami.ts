@@ -2,13 +2,14 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@src/db";
 import { getSession } from "@api-utils/sessions";
+import { AuthMetadata } from "@src/context/AuthContext";
+import { initNearConnection } from "@src/utils/services/contractService";
+import { configureNetwork } from "@src/utils/config";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Typically you might pass the token as a header (e.g. Authorization).
-  // But if you're passing it as a query param, do this:
   const { token } = req.query;
   if (!token || typeof token !== "string") {
     return res.status(400).json({ error: "No token provided" });
@@ -28,19 +29,39 @@ export default async function handler(
     return res.status(404).json({ error: "User not found" });
   }
 
-  // 3) Build your response object
-  const accountMetadata = {
-    keys: { sudo_key: user.sudoKey || "" },
-    contracts: {
-      userDepositAddress: user.evmDepositAddress || "",
-      nearIntentsAddress: user.nearIntentsAddress || "",
+  const config = configureNetwork(
+    process.env.NEXT_PUBLIC_APP_NETWORK_ID as "testnet" | "mainnet"
+  );
+  const { sponsorAccount } = await initNearConnection(
+    config.appNetwork,
+    config.nearNodeURL
+  );
+  const contractId = process.env.NEXT_PUBLIC_CONTRACT_ID!;
+  // Ensure portfolio exists
+  let userInfo;
+  if (user.nearAccountId) {
+    userInfo = await sponsorAccount!.viewFunction({
+      contractId,
+      methodName: "get_user_info",
+      args: {
+        user_id: user.nearAccountId,
+      },
+    });
+  }
+
+  const accountMetadata: AuthMetadata = {
+    contractMetadata: {
+      keys: { sudo_key: user.sudoKey || "" },
+      contracts: {
+        userDepositAddress: user.evmDepositAddress || "",
+        nearIntentsAddress: user.nearIntentsAddress || "",
+      },
+      userInfo,
     },
   };
 
   res.status(200).json({
     username: user.username,
-    userMetadata: {
-      contractMetadata: accountMetadata,
-    },
+    userMetadata: accountMetadata,
   });
 }

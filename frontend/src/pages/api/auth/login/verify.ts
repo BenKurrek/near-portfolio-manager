@@ -1,135 +1,155 @@
 // pages/api/auth/login/verify.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { verifyAuthenticationResponse } from "@simplewebauthn/server";
 import {
-  getUserByCredentialId,
-  updateAuthenticatorCounter,
-} from "@api-utils/user";
-import {
-  getOrCreateGlobalLoginUser,
-  getChallenge,
-  deleteChallenge,
-} from "@api-utils/challenges";
+  verifyAuthenticationResponse,
+  VerifiedAuthenticationResponse,
+} from "@simplewebauthn/server";
+import { getUserByUsername, updateAuthenticatorCounter } from "@api-utils/user";
+import { getChallenge, deleteChallenge } from "@api-utils/challenges";
 import { createSession } from "@api-utils/sessions";
-import { v4 as uuidv4 } from "uuid";
+import { v4 as uuid } from "uuid";
+import { AuthMetadata } from "@context/AuthContext";
+import { initNearConnection } from "@src/utils/services/contractService";
+import { configureNetwork } from "@src/utils/config";
 
-type AuthenticatorTransportFuture = "usb" | "nfc" | "ble" | "internal";
-
-interface LoginResponse {
+interface LoginVerifyResponse {
   verified: boolean;
   token?: string;
   username?: string;
-  accountMetadata?: {
-    contractMetadata: {
-      keys: { sudo_key: string };
-      contracts: {
-        userDepositAddress: string;
-      };
-    };
-  } | null;
+  accountMetadata?: AuthMetadata;
   error?: string;
 }
 
-export default async function loginVerifyHandler(
+export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<LoginResponse>
+  res: NextApiResponse<LoginVerifyResponse>
 ) {
   if (req.method !== "POST") {
-    return res.status(405).end();
+    return res.status(405).json({ error: "Method not allowed" } as any);
   }
 
-  const { assertionResponse } = req.body;
-  if (!assertionResponse) {
+  // 1) Pull out { username, assertionResponse }
+  const { username, assertionResponse } = req.body;
+  if (!username || !assertionResponse) {
+    return res.status(400).json({
+      verified: false,
+      error: "Missing username or assertionResponse",
+    });
+  }
+
+  // 2) Look up user
+  const user = await getUserByUsername(username.toLowerCase());
+  if (!user) {
+    return res.status(404).json({ verified: false, error: "User not found" });
+  }
+
+  // 3) Get challenge from DB for that user
+  const expectedChallenge = await getChallenge(user.id);
+  if (!expectedChallenge) {
+    return res.status(400).json({
+      verified: false,
+      error: "No stored challenge found for this user",
+    });
+  }
+
+  // 4) Find the matching credential
+  const storedAuthenticator = user.authenticators.find(
+    (auth) => auth.id === assertionResponse.id
+  );
+  if (!storedAuthenticator) {
     return res
       .status(400)
-      .json({ verified: false, error: "No assertion response provided" });
+      .json({ verified: false, error: "Authenticator not recognized" });
   }
 
+  // Convert the stored publicKey from a comma‐separated string into a Uint8Array.
+  const publicKeyBytes = Uint8Array.from(
+    storedAuthenticator.publicKey.split(",").map((num) => Number(num))
+  );
+
+  const credentialDevice = {
+    id: storedAuthenticator.id,
+    publicKey: publicKeyBytes,
+    counter: storedAuthenticator.counter,
+    transports: (storedAuthenticator.transports || []) as (
+      | "usb"
+      | "nfc"
+      | "ble"
+      | "internal"
+    )[],
+  };
+
+  // 5) Verify
+  let verification: VerifiedAuthenticationResponse;
   try {
-    // 1) Find which user has this credential ID
-    const user = await getUserByCredentialId(assertionResponse.id);
-    if (!user) {
-      return res
-        .status(400)
-        .json({ verified: false, error: "Authenticator not registered" });
-    }
-
-    // 2) Grab the challenge from the special “global login user”
-    const globalUser = await getOrCreateGlobalLoginUser();
-    const expectedChallenge = await getChallenge(globalUser.id);
-    if (!expectedChallenge) {
-      return res
-        .status(400)
-        .json({ verified: false, error: "No challenge found" });
-    }
-
-    // 3) Prepare the credential info
-    const stored = user.authenticators.find(
-      (authr) => authr.id === assertionResponse.id
-    );
-    if (!stored) {
-      return res
-        .status(400)
-        .json({ verified: false, error: "No matching credential in user" });
-    }
-
-    const credentialForVerification = {
-      id: stored.id,
-      publicKey: new Uint8Array(Buffer.from(stored.publicKey, "base64")),
-      counter: stored.counter,
-      transports: stored.transports.map(
-        (t) => t as AuthenticatorTransportFuture
-      ),
-    };
-
-    // 4) Do the passkey verification
-    const verification = await verifyAuthenticationResponse({
+    verification = await verifyAuthenticationResponse({
       response: assertionResponse,
       expectedChallenge,
       expectedOrigin: process.env.NEXT_PUBLIC_WEBAUTHN_ORIGIN!,
       expectedRPID: process.env.NEXT_PUBLIC_WEBAUTHN_RP_ID!,
-      credential: credentialForVerification,
+      requireUserVerification: true,
+      credential: credentialDevice,
     });
-
-    const { verified, authenticationInfo } = verification;
-
-    if (verified && authenticationInfo) {
-      // 5) Update the counter
-      const { credentialID: authCredentialID, newCounter } = authenticationInfo;
-      await updateAuthenticatorCounter(user.id, authCredentialID, newCounter);
-
-      // 6) Delete the global challenge from DB
-      await deleteChallenge(globalUser.id);
-
-      // 7) Create a session
-      const token = uuidv4();
-      await createSession(token, user.id);
-
-      // 8) Return user info
-      const accountMetadata = {
-        contractMetadata: {
-          keys: { sudo_key: user.sudoKey || "" },
-          contracts: {
-            userDepositAddress: user.userDepositAddress || "",
-          },
-        },
-      };
-
-      return res.status(200).json({
-        verified: true,
-        token,
-        username: user.username,
-        accountMetadata,
-      });
-    } else {
-      return res
-        .status(200)
-        .json({ verified: false, error: "Verification failed" });
-    }
-  } catch (error: any) {
-    console.error(error);
+  } catch (err) {
+    console.error("Error verifying passkey:", err);
     return res
       .status(400)
-      .json({ verified: false, error: "Authentication failed" });
+      .json({ verified: false, error: "Verification failed" });
   }
+
+  const { verified, authenticationInfo } = verification;
+  if (!verified || !authenticationInfo) {
+    return res.status(400).json({ verified: false, error: "Not verified" });
+  }
+
+  // 6) Update signature counter in DB
+  const { newCounter } = authenticationInfo;
+  await updateAuthenticatorCounter(user.id, assertionResponse.id, newCounter);
+
+  // 7) Delete the challenge
+  await deleteChallenge(user.id);
+
+  // 8) Create session token
+  const token = uuid();
+  await createSession(token, user.id);
+
+  // 9) Build any account metadata if you want (like user deposit address)
+  // If you do near stuff:
+  const config = configureNetwork(
+    process.env.NEXT_PUBLIC_APP_NETWORK_ID as "testnet" | "mainnet"
+  );
+  const { sponsorAccount } = await initNearConnection(
+    config.appNetwork,
+    config.nearNodeURL
+  );
+  const contractId = process.env.NEXT_PUBLIC_CONTRACT_ID!;
+  let userInfo;
+  if (user.nearAccountId) {
+    userInfo = await sponsorAccount!.viewFunction({
+      contractId,
+      methodName: "get_user_info",
+      args: {
+        user_id: user.nearAccountId,
+      },
+    });
+  }
+
+  const accountMetadata: AuthMetadata = {
+    contractMetadata: {
+      keys: { sudo_key: user.sudoKey || "" },
+      contracts: {
+        userDepositAddress: user.evmDepositAddress || "",
+        nearIntentsAddress: user.nearIntentsAddress || "",
+      },
+      userInfo,
+    },
+  };
+
+  // 10) Return success
+  return res.status(200).json({
+    verified: true,
+    token,
+    username: user.username,
+    accountMetadata,
+  });
 }

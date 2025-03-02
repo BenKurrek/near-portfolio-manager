@@ -10,7 +10,8 @@ import { logger } from "@src/utils/logger";
 interface JobContextType {
   currentJobId: string | null;
   jobSteps: JobStep[];
-  startJob: (jobType: string, token: string) => Promise<void>;
+  currentJobType: string | null;
+  startJob: (jobType: string, token: string, payload?: any) => Promise<void>;
   clearJob: () => void;
 }
 
@@ -20,6 +21,7 @@ interface JobContextType {
 export const JobContext = createContext<JobContextType>({
   currentJobId: null,
   jobSteps: [],
+  currentJobType: null,
   startJob: async () => {},
   clearJob: () => {},
 });
@@ -29,6 +31,7 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [jobSteps, setJobSteps] = useState<JobStep[]>([]);
+  const [currentJobType, setCurrentJobType] = useState<string | null>(null);
   const { refreshUser } = useContext(AuthContext);
 
   /**
@@ -38,12 +41,11 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
   const pollJobStatus = useCallback(
     (jobId: string, jobType: string): Promise<void> => {
       return new Promise((resolve, reject) => {
+        setCurrentJobType(jobType);
         logger.info(
           `pollJobStatus() started for jobId=${jobId}, type=${jobType}`
         );
         setCurrentJobId(jobId);
-        // Removed the initial step to prevent flashing "Starting create-account"
-        // setJobSteps([{ name: `Starting ${jobType}`, status: "pending" }]);
 
         const interval = setInterval(async () => {
           try {
@@ -60,7 +62,6 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
             if (isCompleted) {
               logger.info(`Job ${jobId} has completed.`);
               clearInterval(interval);
-              setCurrentJobId(null);
 
               const failedStep = steps.find(
                 (step: any) => step.status === "failed"
@@ -78,7 +79,6 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
           } catch (error) {
             logger.error("Error polling job status:", error);
             clearInterval(interval);
-            setCurrentJobId(null);
             reject(error);
           }
         }, 1000);
@@ -92,7 +92,7 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
    * That route should return { success, jobId, ... } so we can poll it.
    */
   const startJob = useCallback(
-    async (jobType: string, token: string) => {
+    async (jobType: string, token: string, payload?: any) => {
       logger.info(`startJob() called with jobType=${jobType}`);
       try {
         if (!token) {
@@ -103,10 +103,30 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
           const response = await apiService.createAccount(token);
           if (response.success && response.jobId) {
             logger.info("create-account job started. Polling...");
+            setCurrentJobType(jobType);
             await pollJobStatus(response.jobId, "create-account");
           }
+        } else if (jobType === "buy-bundle") {
+          // Ensure payload has bundleId and quoteData
+          if (!payload || !payload.bundleId || !payload.quoteData) {
+            throw new Error("Missing payload for buy-bundle job");
+          }
+          const response = await apiService.buyBundle(
+            token,
+            payload.bundleId,
+            payload.quoteData
+          );
+          if (response.success && response.jobId) {
+            logger.info("buy-bundle job started. Polling...");
+            setCurrentJobType(jobType);
+            await pollJobStatus(response.jobId, "buy-bundle");
+          } else {
+            throw new Error(
+              response.message || "Failed to initiate buy-bundle job"
+            );
+          }
         }
-        // Handle other job types as needed...
+        // Add other job types as needed...
       } catch (err) {
         logger.error("startJob error:", err);
       }
@@ -121,6 +141,7 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
     logger.info("Clearing current job from context state.");
     setCurrentJobId(null);
     setJobSteps([]);
+    setCurrentJobType(null);
   }, []);
 
   return (
@@ -128,6 +149,7 @@ export const JobProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         currentJobId,
         jobSteps,
+        currentJobType,
         startJob,
         clearJob,
       }}

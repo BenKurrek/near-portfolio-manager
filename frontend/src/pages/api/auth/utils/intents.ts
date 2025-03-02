@@ -72,19 +72,19 @@ export const prepareSwapIntent = async ({
   const config = configureNetwork("mainnet");
   const nonce = await generateNonce(nearIntentsAddress, config.nearNodeURL);
 
-  // Aggregate amounts per token.
+  // Aggregate amounts per token using BigInt arithmetic.
   // For each quote, subtract the amount_in (token sent) and add the amount_out (token received).
-  const aggregatedDiff: Record<string, number> = {};
+  const aggregatedDiff: Record<string, bigint> = {};
   for (const quote of providerQuotes) {
     const assetIn = quote.defuse_asset_identifier_in;
     const assetOut = quote.defuse_asset_identifier_out;
     aggregatedDiff[assetIn] =
-      (aggregatedDiff[assetIn] || 0) - Number(quote.amount_in);
+      (aggregatedDiff[assetIn] || BigInt(0)) - BigInt(quote.amount_in);
     aggregatedDiff[assetOut] =
-      (aggregatedDiff[assetOut] || 0) + Number(quote.amount_out);
+      (aggregatedDiff[assetOut] || BigInt(0)) + BigInt(quote.amount_out);
   }
 
-  // Convert the aggregated numeric amounts into strings.
+  // Convert the aggregated BigInt amounts into strings.
   // Negative numbers will naturally include a '-' prefix.
   const tokenDiff: Record<string, string> = {};
   for (const [asset, amount] of Object.entries(aggregatedDiff)) {

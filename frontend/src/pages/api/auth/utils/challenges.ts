@@ -63,7 +63,6 @@ export async function getOrCreateGlobalLoginUser() {
       data: {
         username: specialUsername,
         sudoKey: null,
-        userDepositAddress: null,
         authenticators: "[]",
       },
     });

@@ -8,24 +8,25 @@ import LoginModal from "@modals/LoginModal";
 import DepositModal from "@modals/DepositModal";
 import AuthenticatedDashboard from "@components/AuthenticatedDashboard";
 import LoadingOverlay from "@components/LoadingOverlay/LoadingOverlay";
-import SkeletonLoader from "@components/SkeletonLoader";
 import type { AuthMetadata } from "@context/AuthContext";
-import { configureNetwork } from "@src/utils/config";
 import { logger } from "@src/utils/logger";
 import { apiService } from "@services/api";
 import { PriceContext } from "@src/context/PriceContext";
+import WelcomeModal from "@src/components/WelcomeModal";
 
 export default function Home() {
-  const { username, token, accountMetadata, login, logout } =
+  const { username, token, accountMetadata, login, logout, refreshUser } =
     useContext(AuthContext);
 
   // JobContext for background job handling
-  const { currentJobId, jobSteps, startJob, clearJob } = useContext(JobContext);
+  const { currentJobId, jobSteps, startJob, clearJob, currentJobType } =
+    useContext(JobContext);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   // BalanceContext for user token balances
   const { balances, loading: balancesLoading } = useContext(BalanceContext);
   const { prices } = useContext(PriceContext);
-  console.log("balances: ", balances);
+  console.log("balancesSALDJSALKDJ: ", balances);
 
   // Calculate user’s USDC total
   const usdcItems = balances.filter((b) => b.token.symbol === "USDC");
@@ -43,34 +44,34 @@ export default function Home() {
     const symbol = item.token.symbol;
     const price = prices[symbol] || 0; // fallback if missing
     const usdValue = parseFloat(item.balance) * price;
-    if (acc[symbol]) {
-      acc[symbol] += usdValue;
-    } else {
-      acc[symbol] = usdValue;
-    }
+    acc[symbol] = {
+      usdValue,
+      amount: item.balance,
+    };
     return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<string, { usdValue: number; amount: string }>);
 
   const totalNonUsdcBalance = Object.values(aggregatedUSD).reduce(
-    (sum, v) => sum + v,
+    (sum, v) => sum + v.usdValue,
     0
   );
 
   // Build a tokens array for the chart
   const tokens = Object.keys(aggregatedUSD).map((symbol) => {
     const tokenItem = nonUsdcBalances.find((b) => b.token.symbol === symbol);
-    const value = aggregatedUSD[symbol];
+    const item = aggregatedUSD[symbol];
     const percentage = totalNonUsdcBalance
-      ? (value / totalNonUsdcBalance) * 100
+      ? (item.usdValue / totalNonUsdcBalance) * 100
       : 0;
 
     return {
       name: symbol,
       logo: tokenItem?.token.icon || "",
       percentage: parseFloat(percentage.toFixed(2)),
-      // We can pass the "price" along for display
-      usdPrice: prices[symbol] || 0,
-      value,
+      amount: parseFloat(item.amount.toString()).toFixed(
+        symbol === "BTC" ? 8 : symbol === "ETH" ? 6 : 4
+      ),
+      value: item.usdValue,
     };
   });
 
@@ -90,7 +91,7 @@ export default function Home() {
     datasets: [
       {
         label: "USD Balance",
-        data: Object.values(aggregatedUSD),
+        data: Object.values(aggregatedUSD).map((v) => v.usdValue),
         backgroundColor: Object.keys(aggregatedUSD).map(
           (_, i) => colors[i % colors.length]
         ),
@@ -101,11 +102,6 @@ export default function Home() {
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showDepositModal, setShowDepositModal] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
-  const [txHash, setTxHash] = useState<string | null>(null);
-
-  const config = configureNetwork(
-    process.env.NEXT_PUBLIC_APP_NETWORK_ID as "testnet" | "mainnet"
-  );
 
   const handleLogout = async () => {
     if (!token) return;
@@ -199,7 +195,7 @@ export default function Home() {
             username={username}
             accountMetadata={accountMetadata.contractMetadata}
             userBalance={userBalance}
-            transactions={[]}
+            activities={accountMetadata.contractMetadata.userInfo?.activities}
             copied={copied}
             setCopied={setCopied}
             handleDepositClick={() => setShowDepositModal(true)}
@@ -227,11 +223,20 @@ export default function Home() {
           <LoadingOverlay
             steps={jobSteps}
             onComplete={() => {
+              refreshUser();
+              if (currentJobType === "create-account") {
+                setShowWelcomeModal(true);
+              }
               clearJob();
-              setTxHash(null);
             }}
-            txHash={txHash}
-            explorerLink={config.btcExplorerBaseUrl}
+          />
+        )}
+        {showWelcomeModal && (
+          <WelcomeModal
+            onClose={() => {
+              refreshUser();
+              setShowWelcomeModal(false);
+            }}
           />
         )}
       </main>

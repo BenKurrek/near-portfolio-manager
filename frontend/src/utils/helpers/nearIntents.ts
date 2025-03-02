@@ -118,10 +118,6 @@ export const fetchQuote = async ({
   exact_amount_in: string;
   min_deadline_ms?: number;
 }): Promise<Quote[] | null> => {
-  console.log("fetching quote");
-  console.log("defuse_asset_identifier_in: ", defuse_asset_identifier_in);
-  console.log("defuse_asset_identifier_out: ", defuse_asset_identifier_out);
-  console.log("exact_amount_in: ", exact_amount_in);
   const reqData = {
     jsonrpc: "2.0",
     id: "dontcare",
@@ -389,7 +385,6 @@ export const signMessage = async (keyString: string, message: string) => {
 };
 
 export const postToSolverRelay2 = async (reqData: any) => {
-  console.log("reqData: ", reqData);
   const res = await fetch("https://solver-relay-v2.chaindefuser.com/rpc", {
     method: "POST",
     headers: {
@@ -418,4 +413,92 @@ function hexToBytes(hex: string) {
     bytes.push(parseInt(hex.slice(i, i + 2), 16));
   }
   return new Uint8Array(bytes);
+}
+
+export type GetIntentTxnHashResult =
+  | {
+      status: "PENDING";
+      hash: null;
+    }
+  | {
+      status: "COMPLETE";
+      hash: string; // The final withdrawal hash
+    }
+  | {
+      status: "INVALID";
+      hash: null;
+      error: string; // Explanation or reason
+    };
+
+/**
+ * The result from getStatus:
+ *   - 'PENDING': The intent is in progress.
+ *   - 'TX_BROADCASTED': The intent has been broadcasted to the network (data.hash is the near transaction hash?)
+ *   - 'SETTLED': The intent has been settled and completed successfully. data.hash is the near transaction hash
+ *   - 'NOT_FOUND_OR_NOT_VALID': Typically indicative that the intent errored out on the smart contract level (data.hash stores near txn hash) or we polled too quickly the API hasn't updated since publish
+ */
+export type IntentState =
+  | "PENDING"
+  | "TX_BROADCASTED"
+  | "SETTLED"
+  | "NOT_FOUND_OR_NOT_VALID";
+
+export type IntentStatusResponse =
+  | PendingIntentStatusResponse
+  | {
+      status: IntentState;
+      intent_hash: string;
+      data: {
+        hash: string; // this is the "withdrawal_hash"
+      };
+    };
+
+export type PendingIntentStatusResponse = {
+  status: "PENDING";
+  intent_hash: string;
+};
+
+export type PublishIntentResponse = {
+  status: "OK" | "FAILED";
+  reason?: "expired" | "internal" | string;
+  intent_hash: string;
+};
+
+export async function getIntentTxnHash(
+  intentHash: string,
+  solverRelayPoster: (args: {
+    methodName: string;
+    args: Record<string, unknown>;
+  }) => Promise<Response>
+): Promise<GetIntentTxnHashResult> {
+  try {
+    const rawIntentRes = await solverRelayPoster({
+      methodName: "get_status",
+      args: { intent_hash: intentHash },
+    });
+    if (!rawIntentRes.ok) {
+      const errorText = await rawIntentRes.text();
+      throw new Error(`HTTP error ${rawIntentRes.status}: ${errorText}`);
+    }
+    const intentRes: { result: IntentStatusResponse } =
+      await rawIntentRes.json();
+    if (!intentRes?.result) {
+      throw new Error(`Invalid response format: ${JSON.stringify(intentRes)}`);
+    }
+    const intentData: IntentStatusResponse = intentRes.result;
+    if (intentData.status === "NOT_FOUND_OR_NOT_VALID") {
+      throw new Error(
+        `Intent not found or invalid: ${JSON.stringify(intentData)}`
+      );
+    }
+    if (intentData.status === "SETTLED") {
+      return { status: "COMPLETE", hash: intentData.data.hash };
+    }
+    // If still pending (or in TX_BROADCASTED state) we return pending.
+    return { status: "PENDING", hash: null };
+  } catch (error: any) {
+    throw new Error(
+      `getIntentTxnHash error for intentHash=${intentHash}: ${error.message}`
+    );
+  }
 }

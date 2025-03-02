@@ -8,15 +8,11 @@ interface LoadingOverlayProps {
     message?: string;
   }[];
   onComplete?: () => void;
-  txHash?: string | null;
-  explorerLink?: string;
 }
 
 const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   steps,
   onComplete,
-  txHash,
-  explorerLink,
 }) => {
   // Only consider the job complete if there is at least one step
   const isCompleted =
@@ -30,7 +26,10 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   >("loading");
 
   useEffect(() => {
+    console.log("isCompleted: ", isCompleted);
     if (isCompleted) {
+      onComplete && onComplete();
+      console.log("isCompleted2: ", isCompleted);
       setAnimationState(hasFailed ? "failure" : "success");
     }
   }, [isCompleted, hasFailed]);
@@ -101,58 +100,6 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
                 </div>
               ))}
             </div>
-          </>
-        )}
-
-        {animationState === "success" && (
-          <>
-            <svg
-              className="h-12 w-12 text-green-400"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-            <p className="mt-4 text-lg font-semibold text-green-400 text-center">
-              Success!
-            </p>
-            {txHash && explorerLink && (
-              <a
-                href={`${explorerLink}/tx/${txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 w-full bg-gray-700 text-gray-100 border border-gray-600 px-5 py-2 flex items-center space-x-2 rounded-lg hover:bg-gray-600 transition duration-200 justify-center"
-              >
-                <span>View on Explorer</span>
-                <svg
-                  className="w-4 h-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 7l5 5m0 0l-5 5m5-5H6"
-                  />
-                </svg>
-              </a>
-            )}
-            <button
-              onClick={() => onComplete && onComplete()}
-              className="bg-gray-700 border border-gray-600 text-gray-200 px-5 py-2 rounded-lg hover:bg-gray-600 transition duration-200 w-full"
-            >
-              Close
-            </button>
           </>
         )}
 

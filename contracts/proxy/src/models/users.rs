@@ -5,4 +5,5 @@ use crate::*;
 pub struct UserInfo {
     pub required_spread: PortfolioSpread,
     pub near_intents_address: String,
+    pub activities: Vec<String>,
 }

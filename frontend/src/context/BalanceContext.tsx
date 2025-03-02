@@ -8,11 +8,10 @@ import React, {
   useMemo,
 } from "react";
 import { AuthContext } from "@context/AuthContext";
-import { flattenTokens } from "@src/utils/intents/flattenTokens";
-import { LIST_TOKENS } from "@src/constants/tokens";
 import { fetchBatchBalances } from "@src/utils/helpers/nearIntents";
 import { configureNetwork } from "@src/utils/config";
 import { FlattenedToken } from "@src/types/tokens";
+import { useTokenContext } from "@context/TokenContext";
 
 interface TokenBalance {
   token: FlattenedToken;
@@ -37,6 +36,8 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const { accountMetadata } = useContext(AuthContext);
+  const { tokens: flattenedTokens } = useTokenContext();
+
   const intentsAddress = useMemo(
     () => accountMetadata?.contractMetadata?.contracts.nearIntentsAddress || "",
     [accountMetadata]
@@ -54,15 +55,10 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
     []
   );
 
-  // Flatten the tokens list
-  const flattened = useMemo(() => flattenTokens(LIST_TOKENS), []);
-
   const refreshBalances = useCallback(async () => {
-    // Only set loading=true if we have NOT completed initial load yet.
     if (!initialLoadComplete) {
       setLoading(true);
     }
-
     if (!intentsAddress) {
       setBalances([]);
       setLoading(false);
@@ -70,14 +66,14 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     try {
-      const tokenIds = flattened.map((t) => t.defuseAssetId);
+      const tokenIds = flattenedTokens.map((t) => t.defuseAssetId);
       const results = await fetchBatchBalances(
         config.nearNodeURL,
         intentsAddress,
         tokenIds
       );
 
-      const newBalances: TokenBalance[] = flattened.map((token, idx) => {
+      const newBalances: TokenBalance[] = flattenedTokens.map((token, idx) => {
         const rawBal = BigInt(results[idx] || "0");
         const decimals = token.decimals;
         const numeric = Number(rawBal) / 10 ** decimals;
@@ -87,19 +83,24 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
           balance: numeric.toString(),
         };
       });
+      console.log("newBalances", newBalances);
 
       const nonZero = newBalances.filter((b) => parseFloat(b.balance) > 0);
-
+      console.log("nonZero", nonZero);
       setBalances(nonZero);
     } catch (error) {
       console.error("Error fetching balances:", error);
       setBalances([]);
     } finally {
       setLoading(false);
-      // Mark that we've done at least one successful fetch
       setInitialLoadComplete(true);
     }
-  }, [intentsAddress, flattened, config.nearNodeURL, initialLoadComplete]);
+  }, [
+    intentsAddress,
+    flattenedTokens,
+    config.nearNodeURL,
+    initialLoadComplete,
+  ]);
 
   useEffect(() => {
     refreshBalances();
@@ -111,7 +112,7 @@ export const BalanceProvider: React.FC<{ children: ReactNode }> = ({
     <BalanceContext.Provider
       value={{
         balances,
-        allTokens: flattened,
+        allTokens: flattenedTokens,
         refreshBalances,
         loading: loading && !initialLoadComplete,
       }}

@@ -20,7 +20,10 @@ type SupportedChainName =
   | "solana"
   | "dogecoin"
   | "turbochain"
-  | "aurora";
+  | "aurora"
+  | "gnosis"
+  | "berachain"
+  | "zcash";
 interface FungibleTokenInfo extends Partial<BaseTokenBalance> {
   defuseAssetId: string;
   address: string;
@@ -68,4 +71,3 @@ export interface UnifiedTokenInfo {
   icon: string;
   groupedTokens: BaseTokenInfo[];
 }
-

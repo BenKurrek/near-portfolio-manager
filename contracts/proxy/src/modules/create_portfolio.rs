@@ -13,6 +13,7 @@ impl IntentsProxyMpcContract {
         let user = UserInfo {
             required_spread: portfolio_data,
             near_intents_address,
+            activities: Vec::new(),
         };
         self.user_info.insert(owner_id.clone(), user);
 

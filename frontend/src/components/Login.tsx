@@ -17,13 +17,20 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
   const [message, setMessage] = useState<string>("");
+  const [username, setUsername] = useState<string>("");
 
   const handleLogin = async () => {
     try {
+      if (!username) {
+        setMessage("Please enter your username.");
+        return;
+      }
       setMessage("Requesting login options...");
 
-      // Get Login Options
-      const { data: options } = await axios.post("/api/auth/login/options", {});
+      // Pass the username in the login options request
+      const { data: options } = await axios.post("/api/auth/login/options", {
+        username,
+      });
 
       setMessage("Please authenticate using your passkey...");
 
@@ -33,8 +40,9 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
 
       setMessage("Verifying response...");
 
-      // Verify
+      // Pass both username and assertionResponse to verify endpoint
       const { data } = await axios.post("/api/auth/login/verify", {
+        username,
         assertionResponse,
       });
 
@@ -59,6 +67,13 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
 
   return (
     <div className="space-y-4">
+      <input
+        type="text"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        placeholder="Username"
+        className="w-full p-2 border border-gray-300 rounded-md text-black"
+      />
       <button
         onClick={handleLogin}
         className="flex items-center justify-center w-full bg-gray-100 text-black py-2 px-4 rounded-md hover:bg-gray-300 transition border border-gray-300 text-md"
@@ -66,7 +81,7 @@ const Login: React.FC<LoginProps> = ({ onLoggedIn }) => {
         Log In
       </button>
       {message && (
-        <p className="mt-2 text-sm text-center text-red-700">{message}</p>
+        <p className="mt-2 text-sm text-center text-gray-200">{message}</p>
       )}
     </div>
   );

@@ -37,7 +37,10 @@ export default async function handler(
   // Create a job
   const jobId = await createJob(
     "create-account",
-    [{ name: "Creating Account", status: "pending" }],
+    [
+      { name: "Creating Account", status: "pending" },
+      { name: "Configuring deposit address", status: "pending" },
+    ],
     user.id
   );
 
@@ -50,7 +53,8 @@ export default async function handler(
   // Asynchronous background process
   (async () => {
     try {
-      await updateJobStep(jobId, "Creating User", "in-progress");
+      await updateJobStep(jobId, "Creating Account", "in-progress");
+      await updateJobStep(jobId, "Configuring deposit address", "in-progress");
 
       // Create a new account ID using the current timestamp and the username
       const networkId = process.env.NEXT_PUBLIC_APP_NETWORK_ID! as
@@ -78,6 +82,7 @@ export default async function handler(
       });
 
       await updateJobStep(jobId, "Creating Account", "completed");
+      await updateJobStep(jobId, "Configuring deposit address", "completed");
     } catch (err: any) {
       console.error("create account error:", err);
       await updateJobStep(jobId, "Creating Account", "failed", err.message);
