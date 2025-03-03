@@ -1,1 +1,1 @@
-nearai agent task /Users/zach/.nearai/registry/zachman.near/test/0.0.1 "run the task" --local --env_vars='{"agent_id": "agent-1740901697549.near", "contract_id": "proxy-1740901684353.near"}'
+nearai agent task /Users/zach/.nearai/registry/zachman.near/portfolio-agent/0.0.1 "run the task" --local --env_vars='{"agent_id": "agent-1740901697549.near", "contract_id": "proxy-1740901684353.near"}'

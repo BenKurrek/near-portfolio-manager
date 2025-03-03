@@ -194,7 +194,7 @@ async def run(env: Environment):
         pass
     
     # Step 2: Get agent's info
-    near = env.set_near(account_id=agent_id, private_key="ed25519:v7Y17dAeFujQ8QB1AxZZg6qxkrv9RxCPfbDAMUkrnnStKWFjnPysJgEoapxaSx5UFhJWxNUQfiTPfNHuD9zNATm")
+    near = env.set_near(account_id=agent_id, private_key=env.env_vars["pk"])
     
     result = await near.view(
         contract_id=contract_id,
@@ -207,7 +207,6 @@ async def run(env: Environment):
         print("Agent info: {str(agent_info)}")
      
     # Step 3: Get user's info and portfolio
-    # agent_info = [agent_info[1]]
     for agent in agent_info:
         print(f"Current agent: {agent}")
         # TODO loop through all
@@ -223,9 +222,6 @@ async def run(env: Environment):
             
         near_intents_address = user_info["near_intents_address"]
         tokens = user_info["required_spread"]
-        temp = tokens["nep141:btc.omft.near"]
-        tokens["nep141:btc.omft.near"] = tokens["nep141:wrap.near"]
-        tokens["nep141:wrap.near"] = temp
         token_ids = list(tokens.keys())
         if not USDC_TOKEN_ID in token_ids:
             token_ids.append(USDC_TOKEN_ID)
